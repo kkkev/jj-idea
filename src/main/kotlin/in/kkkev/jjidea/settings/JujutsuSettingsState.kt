@@ -49,5 +49,8 @@ data class JujutsuSettingsState(
     var dragRebaseSourceMode: String = "REVISION",
     // jj-idea-b0p2: description prefilled in New Change... for a two-bookmark merge. Must contain
     // {source} and {destination} (ui.newchange.isValidMergeTemplate); invalid values fall back to the default.
-    var mergeDescriptionTemplate: String = "Merge branch '{source}' into {destination}"
+    var mergeDescriptionTemplate: String = "Merge branch '{source}' into {destination}",
+    // jj-idea-crik (GitHub #90): periodic background `jj git fetch`. 0 = off (default). Read via
+    // JujutsuSettings.autoFetchInterval, which clamps to AUTO_FETCH_MIN..AUTO_FETCH_MAX minutes.
+    var autoFetchIntervalMinutes: Int = 0
 )

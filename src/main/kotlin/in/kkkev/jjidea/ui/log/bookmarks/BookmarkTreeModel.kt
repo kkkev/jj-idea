@@ -136,7 +136,9 @@ sealed interface BookmarkNode {
         val children: List<BookmarkNode>,
         val defaultExpanded: Boolean = true,
         override val rollup: BookmarkRollup = BookmarkRollup.EMPTY,
-        val isDanglingHeadsGroup: Boolean = false
+        val isDanglingHeadsGroup: Boolean = false,
+        /** Set on a remote's category (the same text as [displayName]); drives the last-fetched indicators. */
+        val remoteName: String? = null
     ) :
         BookmarkNode, WithRefKind
 
@@ -333,7 +335,8 @@ private fun buildRepoNodes(
                 RefKind.BOOKMARK,
                 children,
                 defaultExpanded = false,
-                rollup = rollupOf(children)
+                rollup = rollupOf(children),
+                remoteName = remote
             )
         )
     }

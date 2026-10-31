@@ -24,6 +24,7 @@ import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.*
+import com.intellij.ui.JBColor
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.update.MergingUpdateQueue
 import com.intellij.util.ui.update.Update
@@ -43,6 +44,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Expression
+import `in`.kkkev.jjidea.jj.FetchTimes
 import `in`.kkkev.jjidea.jj.HIDDEN_TARGET_LIMIT
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -57,6 +59,7 @@ import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.common.RepositoryIcons
 import `in`.kkkev.jjidea.ui.components.*
+import `in`.kkkev.jjidea.util.fetchTimeLabel
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Component
@@ -862,6 +865,14 @@ class JujutsuBookmarksPanel(
                     canvas.colored(node.refKind.color) {
                         smaller {
                             append(node.displayName)
+                        }
+                    }
+                    // When the remote was last fetched this session, as a time of day (not "5 min ago",
+                    // which would sit on screen going stale-wrong until the tree is next repainted).
+                    (node as? BookmarkNode.Category)?.remoteName?.let { remote ->
+                        FetchTimes.lastFetched(node.repo.directory.path, remote)?.let { at ->
+                            canvas.append(" ")
+                            canvas.colored(JBColor.GRAY) { smaller { append(fetchTimeLabel(at)) } }
                         }
                     }
                     // A collapsed category/prefix hides its leaves' own ↑n↓m divergence chips, so

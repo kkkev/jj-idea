@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
@@ -25,7 +26,9 @@ import org.junit.jupiter.api.Test
 @RunInEdt
 class CommandStaleInterceptTest {
     private val project = mockk<Project>()
-    private val repo = mockk<JujutsuRepository>()
+    private val repo = mockk<JujutsuRepository> {
+        every { directory } returns mockk<VirtualFile> { every { path } returns "/repo/stale-intercept" }
+    }
 
     init {
         every { repo.project } returns project

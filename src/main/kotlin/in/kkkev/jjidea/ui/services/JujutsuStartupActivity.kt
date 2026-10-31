@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.ui.services
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
+import `in`.kkkev.jjidea.actions.git.AutoFetchService
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.setup.JjUserConfigChecker
@@ -44,6 +45,10 @@ class JujutsuStartupActivity : ProjectActivity {
         // Non-intrusive, once-per-install sponsor ask after sustained use (jj-idea-z1ld). Also
         // runs via its own runLater, queued behind the signpost's above.
         SponsorAsk.askIfNeeded(project)
+
+        // Periodic auto-fetch (jj-idea-crik); a no-op unless enabled in settings.
+        val autoFetch = AutoFetchService.getInstance(project)
+        project.stateModel.initialisedRepositories.connectAndFireSync(autoFetch) { autoFetch.reconcile(it.values) }
 
         // Initialize availability checking
         project.jjAvailabilityStatus.connectAndFireSync(project) { status ->

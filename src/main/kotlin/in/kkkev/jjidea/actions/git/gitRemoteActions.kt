@@ -9,11 +9,13 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.FetchTimes
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.createCommand
+import `in`.kkkev.jjidea.jj.fetchedRemoteNames
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.jj.runRecoverable
 import `in`.kkkev.jjidea.settings.JujutsuSettings
@@ -40,6 +42,7 @@ internal fun performFetch(spec: GitFetchDialog.GitFetchSpec, project: Project) {
         }
         repo.createCommand { gitFetch(spec.remote, spec.allRemotes) }
             .onSuccess {
+                FetchTimes.record(directory.path, fetchedRemoteNames(spec.remote, spec.allRemotes))
                 invalidate(vfsChanged = true)
                 log.info("Fetched for $displayName")
             }

@@ -445,9 +445,17 @@ interface CommandExecutor {
      * Fetch from a Git remote.
      * @param remote Specific remote to fetch from (null = default)
      * @param allRemotes Fetch from all remotes
+     * @param ignoreWorkingCopy Pass `--ignore-working-copy`: no working-copy snapshot is taken first, so
+     *   a fetch run in the background never writes a "snapshot working copy" operation of its own
+     *   (verified: without the flag, a dirty working copy gets one before the fetch operation). If the
+     *   fetch rewrites `@`'s ancestry, the next normal jj command brings the working copy up to date.
      * @return Command result
      */
-    fun gitFetch(remote: Remote? = null, allRemotes: Boolean = false): CommandResult
+    fun gitFetch(
+        remote: Remote? = null,
+        allRemotes: Boolean = false,
+        ignoreWorkingCopy: Boolean = false
+    ): CommandResult
 
     /**
      * Push to a Git remote.
@@ -750,7 +758,12 @@ interface CommandExecutor {
         val onSuccessResult: CommandResult.Success.() -> Unit
         val onFailure: CommandResult.Failure.() -> Unit
 
+        /** Root path this command acts on, for [RepoActivity] tracking; null if it has no repository. */
+        val busyKey: String? get() = null
+
         fun createContext(result: CommandResult.Success): CO
+
+        private fun runAction() = RepoActivity.track(busyKey) { commandExecutor.action() }
 
         fun fireFailure(failure: CommandResult.Failure, retry: () -> Unit) = onFailure(failure)
 
@@ -778,7 +791,7 @@ interface CommandExecutor {
         fun executeAsync() {
             saveAllDocuments()
             runInBackground {
-                handleResult(commandExecutor.action()) { executeAsync() }
+                handleResult(runAction()) { executeAsync() }
             }
         }
 
@@ -787,7 +800,7 @@ interface CommandExecutor {
             object : Task.Backgroundable(project, title, false) {
                 override fun run(indicator: ProgressIndicator) {
                     indicator.isIndeterminate = true
-                    handleResult(commandExecutor.action()) { executeWithProgress(project, title) }
+                    handleResult(runAction()) { executeWithProgress(project, title) }
                 }
             }.queue()
         }
@@ -806,6 +819,8 @@ interface CommandExecutor {
             private val divergenceHandler: (JujutsuRepository, CommandResult.Failure.Divergent) -> Unit =
                 JujutsuRepository::handleDivergentChange
         ) : Command<WithRepo, ContextWithRepo<CommandResult.Success>> {
+            override val busyKey get() = repo.directory.path
+
             override fun createContext(result: CommandResult.Success) = ContextWithRepo(this, result)
 
             fun onSuccess(callback: JujutsuRepository.(String) -> Unit): WithRepo =

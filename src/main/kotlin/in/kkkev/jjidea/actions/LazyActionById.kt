@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.actions
 
 import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ex.TooltipDescriptionProvider
 
 /**
  * Toolbar entry that delegates to whichever action is currently registered under [actionId],
@@ -14,7 +15,9 @@ import com.intellij.openapi.actionSystem.*
  * Resolving by id on every call always delegates to whichever instance the *current* plugin
  * classloader has registered, so a stale delegate is never invoked.
  */
-class LazyActionById(private val actionId: String) : AnAction() {
+class LazyActionById(private val actionId: String) :
+    AnAction(),
+    TooltipDescriptionProvider {
     private val delegate: AnAction? get() = ManagedActions[actionId]
 
     override fun update(e: AnActionEvent) {

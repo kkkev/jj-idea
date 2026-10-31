@@ -6,6 +6,7 @@ import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.ClosestBookmarks
 import `in`.kkkev.jjidea.jj.CommitId
+import `in`.kkkev.jjidea.jj.FetchTimes
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.resolveEntry
@@ -21,6 +22,8 @@ import `in`.kkkev.jjidea.ui.components.appendClosestBookmarkStatus
 import `in`.kkkev.jjidea.ui.components.appendTagChip
 import `in`.kkkev.jjidea.ui.components.htmlString
 import `in`.kkkev.jjidea.ui.components.icon
+import `in`.kkkev.jjidea.util.fetchTimeLabel
+import `in`.kkkev.jjidea.util.relativeAgo
 
 /**
  * Hover-tooltip HTML for a bookmarks-panel row (jj-idea-uyu9, GitHub #110) — v2, rewritten after
@@ -90,6 +93,18 @@ internal fun bookmarkNodeTooltip(
         } else {
             appendGroupBracket(node.displayName, node.rollup)
             appendLeafCount(node.refKind, node.rollup.leafCount)
+            node.remoteName?.let { remote ->
+                FetchTimes.lastFetched(node.repo.directory.path, remote)?.let { at ->
+                    append("\n")
+                    append(
+                        JujutsuBundle.message(
+                            "bookmarks.panel.tooltip.remote.last.fetched",
+                            fetchTimeLabel(at),
+                            relativeAgo(at)
+                        )
+                    )
+                }
+            }
         }
     }
 

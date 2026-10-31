@@ -16,11 +16,14 @@ import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.*
+import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.dsl.builder.*
+import com.intellij.ui.layout.selected
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.NamedColorUtil
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.git.AutoFetchService
 import `in`.kkkev.jjidea.actions.git.GitPushDialog
 import `in`.kkkev.jjidea.actions.git.manageRemotesEnabled
 import `in`.kkkev.jjidea.actions.git.showManageRemotes
@@ -268,6 +271,40 @@ class JujutsuConfigurable(
                         maxLineLength = NARROW_COMMENT_WIDTH
                     )
             }
+            lateinit var autoFetch: Cell<JBCheckBox>
+            row {
+                autoFetch = checkBox(JujutsuBundle.message("settings.general.auto.fetch"))
+                    .bindSelected(
+                        { settings.state.autoFetchIntervalMinutes > 0 },
+                        {
+                            if (!it) {
+                                settings.state.autoFetchIntervalMinutes = 0
+                            } else if (settings.state.autoFetchIntervalMinutes <= 0) {
+                                settings.state.autoFetchIntervalMinutes = JujutsuSettings.AUTO_FETCH_DEFAULT_MINUTES
+                            }
+                        }
+                    )
+                label(JujutsuBundle.message("settings.general.auto.fetch.every"))
+                spinner(JujutsuSettings.AUTO_FETCH_MIN_MINUTES..JujutsuSettings.AUTO_FETCH_MAX_MINUTES)
+                    .bindIntValue(
+                        {
+                            settings.state.autoFetchIntervalMinutes.takeIf { it > 0 }
+                                ?: JujutsuSettings.AUTO_FETCH_DEFAULT_MINUTES
+                        },
+                        {
+                            if (settings.state.autoFetchIntervalMinutes >
+                                0
+                            ) {
+                                settings.state.autoFetchIntervalMinutes = it
+                            }
+                        }
+                    )
+                    .enabledIf(autoFetch.selected)
+                label(JujutsuBundle.message("settings.general.auto.fetch.minutes"))
+            }.rowComment(
+                JujutsuBundle.message("settings.general.auto.fetch.comment"),
+                maxLineLength = NARROW_COMMENT_WIDTH
+            )
             row(JujutsuBundle.message("settings.general.merge.template.label")) {
                 textField()
                     .bindText(settings.state::mergeDescriptionTemplate)
@@ -1009,6 +1046,9 @@ class JujutsuConfigurable(
             previousHideStandardCommitToolWindow = settings.state.hideStandardCommitToolWindow
             project.messageBus.syncPublisher(ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED).directoryMappingChanged()
         }
+
+        // jj-idea-crik: restart the auto-fetch jobs so a new interval / on-off takes effect now.
+        AutoFetchService.getInstance(project).reconcile()
 
         // Save global identity — bindings were updated from the fields by super.apply()
         val config = rootlessConfig.user

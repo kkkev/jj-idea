@@ -258,7 +258,8 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
 
     override fun gitFetch(
         remote: Remote?,
-        allRemotes: Boolean
+        allRemotes: Boolean,
+        ignoreWorkingCopy: Boolean
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
     override fun gitPush(

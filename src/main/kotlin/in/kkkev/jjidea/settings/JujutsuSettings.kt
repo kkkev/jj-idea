@@ -12,6 +12,8 @@ import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Persistent configuration for Jujutsu plugin.
@@ -190,8 +192,16 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
         }
     }
 
+    /** jj-idea-crik: automatic-fetch period, or null when off. Clamped so a hand-edited value can't hammer the remote. */
+    val autoFetchInterval: Duration?
+        get() = state.autoFetchIntervalMinutes.takeIf { it > 0 }
+            ?.coerceIn(AUTO_FETCH_MIN_MINUTES, AUTO_FETCH_MAX_MINUTES)?.minutes
+
     companion object {
         const val DEFAULT_LOG_WINDOW_ID = "default"
+        const val AUTO_FETCH_MIN_MINUTES = 1
+        const val AUTO_FETCH_MAX_MINUTES = 120
+        const val AUTO_FETCH_DEFAULT_MINUTES = 10
 
         fun getInstance(project: Project): JujutsuSettings = project.getService(JujutsuSettings::class.java)
     }

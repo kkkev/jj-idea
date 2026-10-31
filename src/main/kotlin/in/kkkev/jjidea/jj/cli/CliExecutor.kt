@@ -366,11 +366,16 @@ internal fun fileListArgs(paths: List<String>, revision: Revision = WorkingCopy)
 /** Build the argument list for `jj git fetch`. IRREVERSIBLE - verified: reverting a fetch leaves
  * `main@origin` still pointing at the fetched (now hidden) commit while local `main` moves back,
  * a visibly broken repo. */
-internal fun gitFetchArgs(remote: Remote? = null, allRemotes: Boolean = false) = JjInvocation(
+internal fun gitFetchArgs(
+    remote: Remote? = null,
+    allRemotes: Boolean = false,
+    ignoreWorkingCopy: Boolean = false
+) = JjInvocation(
     IRREVERSIBLE,
     buildList {
         add("git")
         add("fetch")
+        if (ignoreWorkingCopy) add("--ignore-working-copy")
         if (allRemotes) {
             add("--all-remotes")
         } else if (remote != null) {
@@ -1081,8 +1086,8 @@ class CliExecutor(
         insertBefore: Revision?
     ) = execute(root, splitInteractiveArgs(revision, description, parallel, configArgs, tool, insertBefore))
 
-    override fun gitFetch(remote: Remote?, allRemotes: Boolean) =
-        execute(root, gitFetchArgs(remote, allRemotes), timeout = networkTimeout)
+    override fun gitFetch(remote: Remote?, allRemotes: Boolean, ignoreWorkingCopy: Boolean) =
+        execute(root, gitFetchArgs(remote, allRemotes, ignoreWorkingCopy), timeout = networkTimeout)
 
     override fun gitPush(
         remote: Remote?,

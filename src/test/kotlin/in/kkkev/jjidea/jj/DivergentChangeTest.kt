@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.jj
 
 import com.intellij.execution.process.ProcessOutput
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import `in`.kkkev.jjidea.jj.CommandExecutor.CommandResult
@@ -67,7 +68,10 @@ class DivergentChangeTest {
 @TestApplication
 @RunInEdt
 class CommandDivergentInterceptTest {
-    private val repo = mockk<JujutsuRepository> { every { project } returns mockk<Project>() }
+    private val repo = mockk<JujutsuRepository> {
+        every { project } returns mockk<Project>()
+        every { directory } returns mockk<VirtualFile> { every { path } returns "/repo/divergent-intercept" }
+    }
     private val divergent = CommandResult.Failure.Divergent("", DIVERGENT_STDERR, "nrqnpoqonrqn")
 
     @Test

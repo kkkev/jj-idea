@@ -40,6 +40,12 @@ class CliExecutorGitRemoteTest {
         fun `fetch is irreversible - verified, reverting leaves remote-tracking desynced from local`() {
             gitFetchArgs().reversibility shouldBe Reversibility.IRREVERSIBLE
         }
+
+        @Test
+        fun `ignoreWorkingCopy adds the global flag and is off by default`() {
+            gitFetchArgs(ignoreWorkingCopy = true).args shouldBe listOf("git", "fetch", "--ignore-working-copy")
+            gitFetchArgs().args shouldBe listOf("git", "fetch")
+        }
     }
 
     @Nested
