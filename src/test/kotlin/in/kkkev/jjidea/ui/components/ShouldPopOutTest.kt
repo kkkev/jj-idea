@@ -9,8 +9,17 @@ class ShouldPopOutTest {
         popupShowing: Boolean = false,
         showing: Boolean = true,
         now: Long = 1_000,
-        suppressedUntil: Long = 0
-    ) = shouldPopOut(collapsed, popupShowing, showing, now, suppressedUntil)
+        suppressedUntil: Long = 0,
+        inlineWidth: Int = 200,
+        popupWidth: Int = 460
+    ) = shouldPopOut(collapsed, popupShowing, showing, now, suppressedUntil, inlineWidth, popupWidth)
+
+    @Test
+    fun `not when the inline box is already as wide as the popup`() {
+        pop(inlineWidth = 460) shouldBe false
+        pop(inlineWidth = 600) shouldBe false
+        pop(inlineWidth = 459) shouldBe true
+    }
 
     @Test
     fun `pops out when the box is inline, whatever the mode`() {

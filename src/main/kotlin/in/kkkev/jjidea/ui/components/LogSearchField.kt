@@ -16,6 +16,7 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.SearchFieldWithExtension
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -29,6 +30,7 @@ import java.awt.CardLayout
 import java.awt.Component
 import java.awt.Cursor
 import java.awt.Dimension
+import java.awt.Point
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.event.FocusAdapter
@@ -267,7 +269,9 @@ class LogSearchField(
                             popup != null,
                             isShowing,
                             System.nanoTime(),
-                            popOutSuppressedUntil
+                            popOutSuppressedUntil,
+                            field.width,
+                            JBUI.scale(POPUP_WIDTH)
                         )
                     ) {
                         popOut()
@@ -278,7 +282,7 @@ class LogSearchField(
     }
 
     /**
-     * Shows the chip in the box's place and pops the full field out under it (jj-idea-ehwm.7), as happens when the
+     * Shows the chip in the box's place and pops the full field out over it (jj-idea-ehwm.7), as happens when the
      * box is squeezed; the field returns when the popup closes.
      */
     private fun popOut() {
@@ -363,7 +367,8 @@ class LogSearchField(
             }
         )
         popup = created
-        created.showUnderneathOf(chip)
+        // Overlay the chip (offsets cancel the content border) so the field expands in place rather than dropping a row.
+        created.show(RelativePoint(chip, Point(-JBUI.scale(8), -JBUI.scale(6))))
     }
 
     /** Builds a [LogFilterMatcher] from the current text and toggles, or null for a blank query. */
@@ -579,12 +584,14 @@ private const val POP_OUT_SUPPRESS_NANOS = 400_000_000L
 /**
  * Whether activating the search box should pop it out: in either mode (a long text search needs room as much as
  * a revset), only while the box is inline (not already the chip or in the popup), and not right after the popup
- * closed.
+ * closed, and only when the inline box is narrower than the popup would be (otherwise popping out gains nothing).
  */
 internal fun shouldPopOut(
     collapsed: Boolean,
     popupShowing: Boolean,
     showing: Boolean,
     now: Long,
-    suppressedUntil: Long
-) = !collapsed && !popupShowing && showing && now >= suppressedUntil
+    suppressedUntil: Long,
+    inlineWidth: Int,
+    popupWidth: Int
+) = !collapsed && !popupShowing && showing && now >= suppressedUntil && inlineWidth < popupWidth

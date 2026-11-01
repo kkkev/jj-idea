@@ -390,7 +390,7 @@ Use FX-STRESS.
 - [ ] With it on, `heads(::@)` shows only the matching rows (after the "Filtering…" pause); Enter applies at once. The revset ANDs with the Scope chip and the other chips (add an Author chip and only that author's matches remain)
 - [ ] Typing `heads(` gives the whole box a red outline and a one-line hover message (e.g. "Failed to parse revset: Syntax error: expected … (column 7)") with no `|` snippet and none of the scope/chip terms. The status bar shows the same short text as "Search revset error", and the previous rows stay (the log is not emptied). Fixing the text clears the outline and tooltip
 - [ ] With a bad *scope* and a valid search, the search box is not outlined (the status bar names the error)
-- [ ] Narrowing the tool window until the box would leave only a few characters to type collapses it to a compact chip (search icon + text, red text on an error). Clicking the chip pops out the full box with the toggles; Enter applies and closes it, Esc closes it, and the text and toggles are kept. Widening brings the inline box back
+- [ ] Narrowing the tool window until the box would leave only a few characters to type collapses it to a compact chip (search icon + text, red text on an error). Clicking the chip pops out the full box with the toggles; Enter applies and closes it, Esc closes it, and the text and toggles are kept. Widening brings the inline box back. Clicking into a narrower-than-popup inline box pops it out over the box at the same height (not a row below it); with the box already as wide as the popup (~460px), clicking in edits inline with no popup (GitHub #153)
 - [ ] The Rebase, Squash Into… and Move Bookmark to Change pickers and file history have no revset toggle
 
 #### Search by Git commit hash
