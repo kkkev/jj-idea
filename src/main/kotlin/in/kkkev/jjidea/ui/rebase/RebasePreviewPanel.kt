@@ -1,10 +1,12 @@
 package `in`.kkkev.jjidea.ui.rebase
 
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.components.installIconAwareTableTooltip
@@ -15,6 +17,9 @@ import `in`.kkkev.jjidea.ui.log.hideAllButGraphColumn
 import `in`.kkkev.jjidea.ui.log.setGraphRenderer
 import `in`.kkkev.jjidea.ui.squash.SquashSimulation
 import `in`.kkkev.jjidea.ui.squash.SquashSimulator
+import `in`.kkkev.jjidea.util.LatestWinsGate
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Color
 import javax.swing.JPanel
@@ -44,6 +49,7 @@ class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
     }
 
     private var graphNodes: Map<ChangeKey, GraphNode> = emptyMap()
+    private val gate = LatestWinsGate()
     private var allEntries: List<LogEntry> = emptyList()
 
     init {
@@ -68,6 +74,10 @@ class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
     /**
      * Update the preview by simulating the rebase and rebuilding the graph.
      *
+     * The simulation and graph layout run on a pooled thread (jj-idea-v6w9) - both are
+     * O(entries) and froze the EDT on huge repos. A "Updating preview…" label shows meanwhile;
+     * only the latest call's result is applied, so a superseded computation is discarded.
+     *
      * @param sourceLabel Override for the summary's source description (e.g. "the new change"),
      *   for callers whose "source" entries don't already exist as real commits - see
      *   [in.kkkev.jjidea.ui.newchange.NewChangeDialog], which simulates `jj new` by passing a
@@ -81,20 +91,32 @@ class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
         destinationMode: RebaseDestinationMode,
         sourceLabel: String? = null
     ) {
-        val simulation = RebaseSimulator.simulate(
-            allEntries,
-            sourceEntries,
-            destinationIds,
-            sourceMode,
-            destinationMode
-        )
-
-        render(
-            simulation.entries,
-            simulation.sourceIds,
-            destinationIds,
-            rebaseSummary(simulation.sourceIds, destinationIds, sourceMode, destinationMode, sourceLabel)
-        )
+        val entries = allEntries
+        val token = gate.next()
+        descriptionLabel.text = JujutsuBundle.message("dialog.rebase.preview.loading")
+        // ModalityState.any(): this runs from a modal dialog, and the default modality would
+        // defer the runLater callback until the dialog closes.
+        runInBackground(ModalityState.any()) {
+            val simulation = RebaseSimulator.simulate(
+                entries,
+                sourceEntries,
+                destinationIds,
+                sourceMode,
+                destinationMode
+            )
+            val nodes = buildHighlightedGraph(simulation.entries, simulation.sourceIds, destinationIds)
+            val summary = rebaseSummary(
+                entries,
+                simulation.sourceIds,
+                destinationIds,
+                sourceMode,
+                destinationMode,
+                sourceLabel
+            )
+            runLater {
+                if (gate.isCurrent(token)) show(simulation.entries, nodes, summary)
+            }
+        }
     }
 
     /**
@@ -102,6 +124,7 @@ class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
      * the graph. [abandonSources] mirrors the dialog's "delete empty source" option.
      */
     fun updateSquash(sources: List<LogEntry>, destination: LogEntry?, abandonSources: Boolean) {
+        gate.next() // supersede any in-flight rebase update
         val simulation = SquashSimulator.simulate(allEntries, sources, destination, abandonSources)
         val destinationIds = setOfNotNull(simulation.destinationId)
         render(
@@ -123,17 +146,25 @@ class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
         destinationIds: Set<ChangeId>,
         summaryHtml: String
     ) {
-        tableModel.setEntries(entries)
+        show(entries, buildHighlightedGraph(entries, sourceIds, destinationIds), summaryHtml)
+    }
 
-        val baseNodes = CommitGraphBuilder().buildGraph(entries)
-        graphNodes = baseNodes.mapValues { (key, node) ->
-            when (key.revision) {
-                in sourceIds -> node.copy(highlightColor = JujutsuColors.SOURCE_HIGHLIGHT)
-                in destinationIds -> node.copy(highlightColor = JujutsuColors.DESTINATION_HIGHLIGHT)
-                else -> node
-            }
+    private fun buildHighlightedGraph(
+        entries: List<LogEntry>,
+        sourceIds: Set<ChangeId>,
+        destinationIds: Set<ChangeId>
+    ) = CommitGraphBuilder().buildGraph(entries).mapValues { (key, node) ->
+        when (key.revision) {
+            in sourceIds -> node.copy(highlightColor = JujutsuColors.SOURCE_HIGHLIGHT)
+            in destinationIds -> node.copy(highlightColor = JujutsuColors.DESTINATION_HIGHLIGHT)
+            else -> node
         }
+    }
 
+    /** EDT-only: installs already-computed rows and graph. */
+    private fun show(entries: List<LogEntry>, nodes: Map<ChangeKey, GraphNode>, summaryHtml: String) {
+        tableModel.setEntries(entries)
+        graphNodes = nodes
         table.setGraphRenderer(graphNodes)
         descriptionLabel.text = summaryHtml
     }
@@ -155,10 +186,12 @@ class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
         if (sources.isEmpty() || destination == null) return ""
         val sourceText = if (sources.size == 1) sources.first().id.short else "${sources.size} changes"
         val outcome = if (simulation.abandonedIds.isEmpty()) "source kept" else "source abandoned"
-        return "<html>${legend()}$sourceText → squash into ${findDisplayName(destination.id)} ($outcome)</html>"
+        val destText = findDisplayName(allEntries, destination.id)
+        return "<html>${legend()}$sourceText → squash into $destText ($outcome)</html>"
     }
 
     private fun rebaseSummary(
+        entries: List<LogEntry>,
         sourceIds: Set<ChangeId>,
         destinationIds: Set<ChangeId>,
         sourceMode: RebaseSourceMode,
@@ -181,7 +214,7 @@ class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
             RebaseSourceMode.BRANCH -> " (whole branch)"
         }
 
-        val destText = destinationIds.joinToString(", ") { findDisplayName(it) }
+        val destText = destinationIds.joinToString(", ") { findDisplayName(entries, it) }
 
         val operationText = when (destinationMode) {
             RebaseDestinationMode.ONTO -> "onto $destText"
@@ -192,8 +225,8 @@ class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
         return "<html>${legend()}$sourceText$modeText → $operationText</html>"
     }
 
-    private fun findDisplayName(id: ChangeId): String {
-        val entry = allEntries.find { it.id == id }
+    private fun findDisplayName(entries: List<LogEntry>, id: ChangeId): String {
+        val entry = entries.find { it.id == id }
         return if (entry != null && entry.bookmarks.isNotEmpty()) {
             entry.bookmarks.first().name.name
         } else {

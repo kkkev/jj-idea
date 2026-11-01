@@ -584,6 +584,7 @@ See docs/design/jj-idea-2c8k-paged-log-loading.md for the mechanism and its vali
 - [ ] **Duplicate Change** creates an identical copy in place, with a new change ID and the same description; `@` does not move. **Duplicate Onto...** opens a dialog to pick a destination and placement (onto/after/before), then creates the copy there
 - [ ] With ~20 rows selected, **Rebase…** and **Duplicate Onto…** show the source list scrolling within about 5 rows with the destination picker still visible (the source list helper is shared with Squash Into…, GitHub #125)
 - [ ] Hovering a commit row in the Duplicate Onto... destination picker, and in the Rebase destination picker / preview, shows real bookmark/tag chips and status icons in the tooltip, not a broken-image glyph
+- [ ] In a very large repo (e.g. the IntelliJ repo), toggling **Rebase…** source mode / placement / destinations, and typing in the destination search, never freezes the IDE: the picker shows "Updating list…" and the preview "Updating preview…" briefly, and the final picker rows and preview graph match the last choice made. The same holds for the **Duplicate Onto…** and **Squash Into…** destination pickers
 - [ ] **Set Tag Here...** shows a distinct tag-plus badge icon (not the platform's generic + icon); entering a name creates the tag at that commit and the log updates
 
 #### Undo

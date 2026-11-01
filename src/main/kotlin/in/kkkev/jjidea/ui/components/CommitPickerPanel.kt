@@ -17,13 +17,17 @@ import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.log.CommitGraphBuilder
 import `in`.kkkev.jjidea.ui.log.GraphNode
 import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
+import `in`.kkkev.jjidea.ui.log.LogFilterMatcher
 import `in`.kkkev.jjidea.ui.log.fetchSearchResults
 import `in`.kkkev.jjidea.ui.log.hideAllButGraphColumn
 import `in`.kkkev.jjidea.ui.log.setGraphRenderer
 import `in`.kkkev.jjidea.ui.log.topologicalSort
+import `in`.kkkev.jjidea.util.LatestWinsGate
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
+import org.jetbrains.annotations.TestOnly
 import java.awt.BorderLayout
+import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JPanel
 import javax.swing.ListSelectionModel
 
@@ -124,8 +128,7 @@ class CommitPickerPanel(
             runLater {
                 if (disposed) return@runLater
                 entries = loaded
-                applyReload()
-                onInitialLoad()
+                applyReload(andThen = onInitialLoad)
             }
         }
     }
@@ -150,7 +153,7 @@ class CommitPickerPanel(
      */
     fun setEntries(newEntries: List<LogEntry>) {
         entries = newEntries
-        applyReload()
+        applyReloadNow()
         onInitialLoad()
     }
 
@@ -172,13 +175,73 @@ class CommitPickerPanel(
         }
     }
 
-    private fun applyReload() {
-        val matcher = searchField.matcher()
-        val predicate = predicateFor(entries)
-        val filtered = entries.filter { predicate(it) && (matcher?.matches(it) ?: true) }
+    /** Bumped per [applyReload]; a computation whose token is stale is discarded. */
+    private val reloadGate = LatestWinsGate()
 
+    /**
+     * Re-filters [entries] and re-renders. The predicate factory, filter and graph layout are
+     * O(entries) and ran on the EDT, freezing the dialog on huge repos (jj-idea-v6w9), so they
+     * run on a pooled thread and only the latest result is applied on the EDT. [andThen] runs
+     * after the rows are applied, and only if this reload was not superseded.
+     * [setEntries] (a small predefined set) uses the synchronous [applyReloadNow] instead.
+     */
+    private fun applyReload(andThen: () -> Unit = {}) {
+        // Read on the EDT: the field's text and toggles aren't thread-safe.
+        val matcher = searchField.matcher()
+        val snapshot = entries
+        val factory = predicateFor
+        val token = reloadGate.next()
+        statusLabel.text = JujutsuBundle.message("log.status.picker.loading")
+        statusLabel.isVisible = true
+        // ModalityState.any(): this runs from a modal dialog, and the default modality would
+        // defer the runLater callback until the dialog closes.
+        inFlight.incrementAndGet()
+        runInBackground(ModalityState.any()) {
+            val filtered: List<LogEntry>
+            val nodes: Map<ChangeKey, GraphNode>
+            try {
+                filtered = filterEntries(snapshot, factory, matcher)
+                nodes = CommitGraphBuilder().buildGraph(filtered)
+            } catch (t: Throwable) {
+                runLater { inFlight.decrementAndGet() }
+                throw t
+            }
+            runLater {
+                inFlight.decrementAndGet()
+                if (!disposed && reloadGate.isCurrent(token)) {
+                    statusLabel.isVisible = false
+                    showRows(filtered, nodes)
+                    andThen()
+                }
+            }
+        }
+    }
+
+    private val inFlight = AtomicInteger()
+
+    /** True while an async reload has been started but its result not yet delivered to the EDT. */
+    @TestOnly
+    internal fun isReloading() = inFlight.get() > 0
+
+    private fun applyReloadNow() {
+        reloadGate.next() // supersede any in-flight async reload
+        val filtered = filterEntries(entries, predicateFor, searchField.matcher())
+        showRows(filtered, CommitGraphBuilder().buildGraph(filtered))
+    }
+
+    private fun filterEntries(
+        source: List<LogEntry>,
+        factory: (List<LogEntry>) -> (LogEntry) -> Boolean,
+        matcher: LogFilterMatcher?
+    ): List<LogEntry> {
+        val predicate = factory(source)
+        return source.filter { predicate(it) && (matcher?.matches(it) ?: true) }
+    }
+
+    /** EDT-only: installs already-computed rows, restoring the selection as of now. */
+    private fun showRows(filtered: List<LogEntry>, nodes: Map<ChangeKey, GraphNode>) {
         val previousSelection = selectedIds()
-        graphNodes = CommitGraphBuilder().buildGraph(filtered)
+        graphNodes = nodes
         tableModel.setEntries(filtered)
         updateRenderer()
 
@@ -222,13 +285,15 @@ class CommitPickerPanel(
                 val existingKeys = entries.mapTo(HashSet()) { it.key }
                 val newCount = found.count { it.key !in existingKeys }
                 entries = topologicalSort((entries + found).distinctBy { it.key })
-                applyReload()
-                statusLabel.text = if (newCount > 0) {
-                    JujutsuBundle.message("log.status.search.found", newCount, searchField.text)
-                } else {
-                    JujutsuBundle.message("log.status.search.none", searchField.text)
+                val searchText = searchField.text
+                applyReload {
+                    statusLabel.text = if (newCount > 0) {
+                        JujutsuBundle.message("log.status.search.found", newCount, searchText)
+                    } else {
+                        JujutsuBundle.message("log.status.search.none", searchText)
+                    }
+                    statusLabel.isVisible = true
                 }
-                statusLabel.isVisible = true
             }
         }
     }

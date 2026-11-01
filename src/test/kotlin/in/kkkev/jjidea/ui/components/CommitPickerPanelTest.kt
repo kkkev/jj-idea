@@ -76,7 +76,13 @@ class CommitPickerPanelTest {
         }
     }
 
-    private fun waitForInitialLoad(picker: CommitPickerPanel) = waitUntil { picker.entries.isNotEmpty() }
+    /** Waits for the async reload pipeline (predicate, filter, graph layout) to deliver to the EDT. */
+    private fun settle(picker: CommitPickerPanel) = waitUntil { !picker.isReloading() }
+
+    private fun waitForInitialLoad(picker: CommitPickerPanel) {
+        waitUntil { picker.entries.isNotEmpty() }
+        settle(picker)
+    }
 
     @Test
     fun `reload filters the loaded set by the predicate`() {
@@ -89,6 +95,8 @@ class CommitPickerPanelTest {
         waitForInitialLoad(picker)
 
         picker.reload { it.id.full != "bbbbbb" }
+
+        settle(picker)
 
         picker.rowCount shouldBe 1
         picker.entryAt(0)?.id?.full shouldBe "aaaaaa"
@@ -112,12 +120,14 @@ class CommitPickerPanelTest {
             val excluded = setOf(all[0].id)
             ({ it.id !in excluded })
         }
+        settle(picker)
 
         factoryCalls shouldBe 1
         seenSize shouldBe n
         picker.rowCount shouldBe n - 1
 
         picker.searchField.text = "e1"
+        settle(picker)
         factoryCalls shouldBe 2
     }
 
@@ -132,6 +142,7 @@ class CommitPickerPanelTest {
         waitForInitialLoad(picker)
 
         picker.searchField.text = "alpha"
+        settle(picker)
 
         picker.rowCount shouldBe 1
         picker.entryAt(0)?.id?.full shouldBe "aaaaaa"
@@ -147,11 +158,13 @@ class CommitPickerPanelTest {
         val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
         waitForInitialLoad(picker)
         picker.reload { true }
+        settle(picker)
         picker.table.setRowSelectionInterval(0, 0)
         picker.selectedIds().map { it.full } shouldBe listOf("aaaaaa")
 
         // Re-running the same predicate must not disturb the existing selection.
         picker.reload { true }
+        settle(picker)
 
         picker.selectedIds().map { it.full } shouldBe listOf("aaaaaa")
     }
@@ -166,10 +179,13 @@ class CommitPickerPanelTest {
         val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
         waitForInitialLoad(picker)
         picker.reload { true }
+        settle(picker)
         picker.table.setRowSelectionInterval(0, 0)
         picker.selectedIds().map { it.full } shouldBe listOf("aaaaaa")
 
         picker.reload { it.id.full != "aaaaaa" }
+
+        settle(picker)
 
         picker.selectedIds() shouldBe emptySet()
     }
@@ -185,13 +201,16 @@ class CommitPickerPanelTest {
         val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
         waitForInitialLoad(picker)
         picker.reload { true }
+        settle(picker)
 
         // Keystrokes alone (no Enter) only re-run the client-side filter.
         picker.searchField.text = "ccc"
+        settle(picker)
         fake.getLogCallCount shouldBe 0
 
         picker.searchField.textEditor.postActionEvent()
         waitUntil { picker.entries.size > 1 }
+        settle(picker)
 
         fake.getLogCallCount shouldBe 1
         picker.entries.map { it.id.full } shouldBe listOf("aaaaaa", "cccccc")
@@ -208,8 +227,10 @@ class CommitPickerPanelTest {
         val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
         waitForInitialLoad(picker)
         picker.reload { true }
+        settle(picker)
 
         picker.searchField.text = "ccc"
+        settle(picker)
         picker.rowCount shouldBe 0 // not in the loaded window yet
 
         picker.searchField.textEditor.postActionEvent()
@@ -217,5 +238,54 @@ class CommitPickerPanelTest {
 
         picker.rowCount shouldBe 1
         picker.entryAt(0)?.id?.full shouldBe "cccccc"
+    }
+
+    @Test
+    fun `rapid reloads apply only the latest predicate`() {
+        val fake = FakeRepo()
+        val a = entry(fake.repo, "aaaaaa", "alpha")
+        val b = entry(fake.repo, "bbbbbb", "beta")
+        every { fake.repo.logCache.all } returns listOf(a, b)
+
+        val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
+        waitForInitialLoad(picker)
+
+        picker.reload { it.id.full != "aaaaaa" }
+        picker.reload { it.id.full != "bbbbbb" }
+        settle(picker)
+
+        picker.rowCount shouldBe 1
+        picker.entryAt(0)?.id?.full shouldBe "aaaaaa"
+    }
+
+    @Test
+    fun `a reload does not render synchronously on the EDT`() {
+        val fake = FakeRepo()
+        every { fake.repo.logCache.all } returns listOf(entry(fake.repo, "aaaaaa"), entry(fake.repo, "bbbbbb"))
+
+        val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
+        waitForInitialLoad(picker)
+        picker.rowCount shouldBe 2
+
+        picker.reload { it.id.full == "aaaaaa" }
+        picker.rowCount shouldBe 2 // old rows stay until the background result is applied
+        settle(picker)
+
+        picker.rowCount shouldBe 1
+    }
+
+    @Test
+    fun `selection made while a reload is in flight is kept`() {
+        val fake = FakeRepo()
+        every { fake.repo.logCache.all } returns listOf(entry(fake.repo, "aaaaaa"), entry(fake.repo, "bbbbbb"))
+
+        val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
+        waitForInitialLoad(picker)
+
+        picker.reload { true }
+        picker.table.setRowSelectionInterval(1, 1) // before the result lands
+        settle(picker)
+
+        picker.selectedIds().map { it.full } shouldBe listOf("bbbbbb")
     }
 }
