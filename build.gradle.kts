@@ -276,11 +276,13 @@ intellijPlatform {
             // in-range version once (2026.2-only conflict-resolution crash on build 262,
             // jj-idea-qfgl). 2026.1/261 was missing from this list until now; add each new minor
             // platform release here as it ships, not just the newest one.
-            create(IntelliJPlatformType.IntellijIdea, "2025.1")
-            create(IntelliJPlatformType.IntellijIdea, "2025.2")
-            create(IntelliJPlatformType.IntellijIdea, "2025.3")
-            create(IntelliJPlatformType.IntellijIdea, "2026.1")
-            create(IntelliJPlatformType.IntellijIdea, "2026.2")
+            // The local pre-push gate passes -PverifierEdgesOnly and checks only the oldest and
+            // newest (the floor and the newest are where breaks have shown up); CI checks all.
+            val edgesOnly = providers.gradleProperty("verifierEdgesOnly").isPresent
+            val versions = listOf("2025.1", "2025.2", "2025.3", "2026.1", "2026.2")
+            (if (edgesOnly) listOf(versions.first(), versions.last()) else versions).forEach {
+                create(IntelliJPlatformType.IntellijIdea, it)
+            }
         }
     }
 }

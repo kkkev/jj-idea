@@ -83,7 +83,8 @@ jobs:
             echo "No source code changes detected. Skipping changelog check."
           fi
 
-  # Cross-version compatibility gate: compiles, unit-tests, and platform-tests against
+  # Cross-version compatibility gate (and the only place CI runs unit tests, so a failure here
+  # is not necessarily a compatibility problem; read the failing test): compiles, unit-tests, and platform-tests against
   # the full supported platform range — the sinceBuild=251 floor (2025.1), the previous
   # release (2025.2), and the newest supported platform (2026.2, build 262) — separately
   # from the release `build` job (which only builds/publishes on the default
@@ -96,6 +97,7 @@ jobs:
   # they would repeat what the push of the same commit already ran. The release job instead
   # requires that push run to have succeeded ("Require green CI for this commit").
   compat:
+    name: test (${{ matrix.platform }})
     if: ${{ inputs.bump == '' && !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
 

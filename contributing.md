@@ -550,9 +550,10 @@ list as it ships. CI runs this in the `build` job (`.github/workflows/build.yml`
 `verifyPlugin` only checks the packaged plugin's bytecode, not whether sources compile against
 the floor — a platform-API shape change (e.g. a Java interface becoming Kotlin) can break
 `compileKotlin`/`compileTestKotlin` without tripping it. **`scripts/pre-push.sh` runs both**:
-`./gradlew check verifyPlugin`, then main and test compilation against 2025.1 and 2025.2 (into
-separate `build-compat-*/` directories). It does not run tests on the older platforms; CI's
-compat matrix does. Run it (`jj verify`, in the background) before every push to `master`.
+`./gradlew check verifyPlugin -PverifierEdgesOnly` (the verifier runs only on the oldest and
+newest IDE; CI runs it on all of them), then main and test compilation against 2025.1 (into a
+separate `build-compat-*/` directory). It does not run tests on the older platforms; CI's
+compat matrix does, and it is the only CI job that runs unit tests. Run it (`jj verify`, in the background) before every push to `master`.
 
 ## Performance & Scale
 

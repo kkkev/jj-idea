@@ -5,24 +5,30 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.jupiter.api.Test
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 class PollingTest {
-    /** Virtual clock: each wait advances time instantly; [onWait] can cancel the loop to end a test. */
-    private class Clock(val limit: Duration, val job: () -> Job?) {
+    /**
+     * Virtual clock: each wait advances time instantly and, past [limit], cancels the polling
+     * coroutine it is running in. It must not go through a `Job` reference assigned after
+     * `launchPolling` returns: the loop runs on Dispatchers.IO and can pass the limit first.
+     */
+    private class Clock(val limit: Duration) {
         var now = Duration.ZERO
         val waits = mutableListOf<Duration>()
 
         suspend fun wait(d: Duration) {
             waits += d
             now += d
-            if (now > limit) job()?.cancel(CancellationException("done"))
-            kotlinx.coroutines.yield()
+            if (now > limit) currentCoroutineContext().cancel(CancellationException("done"))
+            yield()
         }
     }
 
@@ -32,18 +38,16 @@ class PollingTest {
         maxBackoff: Int = 10,
         task: suspend () -> Boolean
     ): Clock {
-        var job: Job? = null
-        val clock = Clock(limit) { job }
+        val clock = Clock(limit)
         runBlocking {
-            job = CoroutineScope(coroutineContext).launchPolling(
+            CoroutineScope(coroutineContext).launchPolling(
                 "test",
                 { 10.minutes },
                 shouldRun,
                 maxBackoff,
                 clock::wait,
                 task
-            )
-            job!!.join()
+            ).join()
         }
         return clock
     }
