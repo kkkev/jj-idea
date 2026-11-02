@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.9.3/jj-idea-0.9.3.zip" version="0.9.3">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.9.4/jj-idea-0.9.4.zip" version="0.9.4">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,14 +23,24 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.9.3</h3>
+      <h3>0.9.4</h3>
       
-<h4>Fixed</h4>
-<li>**Release rejected by the JetBrains Marketplace compatibility check**: 0.9.2 never reached the Marketplace because the plugin called an internal platform API (`ProgressManager.getInstanceOrNull()`) while shielding a running jj command from cancellation. It now uses the public API. Everything in 0.9.2 ships in this release.</li>
+<h4>Added</h4>
+<li>**Automatic fetch**: Settings → Version Control → Jujutsu → General has "Fetch from remotes automatically" with an interval of 1-120 minutes (off by default, 10 when first enabled). While the IDE is focused it runs `jj git fetch --all-remotes` in the background and the log and Bookmarks panel update when remote bookmarks move; when you return to the IDE after being away longer than the interval it fetches straight away. It never takes a working-copy snapshot of its own, waits while another plugin command is running in that repository, and is silent on success; if a fetch fails you get one warning (not one per attempt) with a button to turn it off, and retries back off up to 10 times the interval. ([#90](https://github.com/kkkev/jj-idea/issues/90))</li>
+<li>**Last fetched time**: hover the Fetch button to see when each remote was last fetched, and see the time beside each remote in the Bookmarks panel (this session only; jj does not record it). ([#90](https://github.com/kkkev/jj-idea/issues/90))</li>
+<li>**Copy Bookmark Name / Copy Tag Name / Copy Folder Path**: right-click a bookmark or tag chip (in the log, the "+N more" popup or the details panel), or a row in the Bookmarks panel, to copy its name to the clipboard. On a remote bookmark it copies the full `name@remote`; on a `/`-grouped folder in the Bookmarks panel it copies the folder path. In the Bookmarks panel, Cmd/Ctrl+C also copies the selected rows' names, one per line.</li>
+<li>**Undo and Redo for the latest operation**: VCS → Jujutsu and the log toolbar have **Undo** and **Redo**, which say what they will act on (for example "Undo 'describe commit 1960…'"), including operations run from a terminal. They ask before the first use ("Don't ask again" is offered) and walk further back or forward when repeated. When the latest operation is a snapshot of working-copy changes (new or edited files), Undo says so ("Undo Working-Copy Changes") and removes those files from disk, and Redo brings them back; if that snapshot includes `.idea/vcs.xml`, which would switch the plugin off for the project, you get an explicit warning with recovery steps first. No default keyboard shortcut, so the editor's Cmd+Z is untouched; assign one under Settings → Keymap. The old "Undo Last Jujutsu Operation" menu item is replaced by these; the Undo link in the notification after an action still works. ([#152](https://github.com/kkkev/jj-idea/issues/152))</li>
 
-<h4>Changed</h4>
-<li>**The log keeps loading until a visible "parent not loaded" line resolves**: when a row on screen draws a faint stub because its parent hasn't loaded yet (common in a filtered log, where a recent match's parent match can be on a later page), the log now pages in the background until that parent arrives, then stops, instead of waiting for you to scroll. It stops at 10,000 loaded rows, so a parent further back than that still needs a click on the line to load it. A parent that a filter excludes is never chased.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.9.3">full release notes</a> for details.</p>
+<h4>Fixed</h4>
+<li>**Invalid bookmark and tag names showed "Unknown error"**: creating a bookmark named e.g. `a&b` failed with an unhelpful message. Create Bookmark, Rename Bookmark and Set Tag now check the name against jj's naming rules as you type, point at the offending character, and block OK until the name is valid; if jj still rejects a name, the error says it could not parse the name.</li>
+<li>**Annotation click jumped to an old change, then the log scrolled back**: clicking an annotation in a repository with deep history selected the change in the log, but a later full reload of the log (a Refresh or edit that could not use paged loading, or the log tab's own first load finishing late) dropped the rows loaded around that change, and the log fell back to a recent one. Those rows are now kept until you press Refresh. ([#140](https://github.com/kkkev/jj-idea/issues/140))</li>
+<li>**Rebase, Duplicate and Squash dialogs froze the IDE on very large repositories**: changing the source mode, placement, destination or search text recomputed the destination list and the preview graph on the UI thread, which could freeze the IDE for a long time in a repository the size of IntelliJ's. That work now runs in the background, with an "Updating…" hint, and only the latest choice is shown ([GitHub #149](https://github.com/kkkev/jj-idea/issues/149)).</li>
+<li>**Log search box popped out even when it was already wide enough, and dropped a row**: clicking into the search box opened the wide popup even when the inline box was already as wide as the popup, and the popup appeared below the box instead of over it. It now only pops out when the inline box is narrower than the popup, and it opens over the box at the same height. ([#153](https://github.com/kkkev/jj-idea/issues/153))</li>
+<li>**Bookmark names with underscores or ampersands lost characters**: a bookmark such as `my_feature` showed as `myfeature` in the main-toolbar bookmark widget, because `_` was read as a keyboard-mnemonic marker. Bookmark names now show exactly as written there, in the bookmark menu and its Delete, Forget, Track and Push items, and in the log's Reference and Author filter lists. ([#156](https://github.com/kkkev/jj-idea/issues/156))</li>
+<li>**Log graph: unloaded-parent line floated free of its merge commit**: when a merge commit had one parent on screen and another not loaded yet (or hidden by a filter), the faint line for the missing parent sat in its own column with nothing joining it to the commit's dot. A short diagonal now connects them.</li>
+<li>**Bookmarks panel change actions could act on the log's selection**: right-clicking (or using a shortcut on) a bookmark, tag or unbookmarked-head row whose change wasn't loaded in the log yet ran New Change, Edit, Rebase or Duplicate against whatever was selected in the log, such as `@`. They are now disabled until the row's change is resolved, then act on that change.</li>
+<li>**File history Show Diff compared a revision with the wrong commit**: in the platform file history tab, Show Diff on a single revision compared it with the row below it. Because file history lists commits from every branch interleaved, that row is often not its parent, so a revision showed changes it never made. It now compares with the revision's real parent (the auto-merged parents for a merge). Selecting two revisions still compares those two.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.9.4">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

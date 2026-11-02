@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-11-02
+
 ### Added
 - **Automatic fetch**: Settings → Version Control → Jujutsu → General has "Fetch from remotes automatically" with an interval of 1-120 minutes (off by default, 10 when first enabled). While the IDE is focused it runs `jj git fetch --all-remotes` in the background and the log and Bookmarks panel update when remote bookmarks move; when you return to the IDE after being away longer than the interval it fetches straight away. It never takes a working-copy snapshot of its own, waits while another plugin command is running in that repository, and is silent on success; if a fetch fails you get one warning (not one per attempt) with a button to turn it off, and retries back off up to 10 times the interval. ([#90](https://github.com/kkkev/jj-idea/issues/90))
 - **Last fetched time**: hover the Fetch button to see when each remote was last fetched, and see the time beside each remote in the Bookmarks panel (this session only; jj does not record it). ([#90](https://github.com/kkkev/jj-idea/issues/90))
@@ -1080,7 +1082,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.9.4
 [0.9.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.9.3
 [0.9.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.9.2
 [0.9.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.9.1
