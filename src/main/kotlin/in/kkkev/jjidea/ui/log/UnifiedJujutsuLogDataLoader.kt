@@ -65,7 +65,8 @@ class UnifiedJujutsuLogDataLoader(
     private var lastLimit: Int = 0
 
     // Per-repo expansion entries accumulated by navigation; keyed by repo identity.
-    // Never discarded by loadCommits — only cleared on explicit Refresh (clearExpansions).
+    // Never discarded by loadCommits (which merges them back in, jj-idea-7rxm) — only cleared on
+    // explicit Refresh (clearExpansions).
     private val expansionEntriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
 
     // jj-idea-ehwm.3: the log tab's filters (search, chips, scope) compile to one revset per repo, which
@@ -242,7 +243,12 @@ class UnifiedJujutsuLogDataLoader(
                 // The base rows were just reloaded from scratch, so bring any active filter's rows up to date too.
                 rewalkFilters(repos)
                 val filterRows = filterEntriesByRepo.values.flatten()
-                val sorted = logOrder((entriesByRepo.values.flatten() + filterRows).distinctBy { it.key })
+                // The expansions too (jj-idea-7rxm, GitHub #140): dropping them here made an annotation
+                // click's target row vanish on any reload, scrolling the log back to a recent change.
+                val expansionRows = expansionEntriesByRepo.values.flatten()
+                val sorted = logOrder(
+                    (entriesByRepo.values.flatten() + expansionRows + filterRows).distinctBy { it.key }
+                )
                 // jj-idea-jnqi bugfix: graphBuilder.buildGraph() and the snapshot write must be
                 // one atomic unit under mergeLock, exactly like fastMergeAndNotify/
                 // fullMergeAndNotify already do - loadCommits() previously called buildGraph()
