@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.vcs.actions
 
+import `in`.kkkev.jjidea.actions.bookmark.classifyBookmarkFailure
 import `in`.kkkev.jjidea.jj.BookmarkName
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
@@ -24,10 +25,15 @@ class BookmarkNameDialogTest {
          * invalid revision, or any other exit-1 failure must not be misreported as a name
          * conflict.
          */
-        private fun classify(exitCode: Int, stderr: String) = when {
-            exitCode == 2 -> "dialog.bookmark.create.error.incorrect.format"
-            stderr.contains("already exists", ignoreCase = true) -> "dialog.bookmark.create.error.already.exists"
-            else -> "dialog.bookmark.create.error.unknown"
+        private fun classify(exitCode: Int, stderr: String) =
+            classifyBookmarkFailure("create", exitCode, stderr)
+
+        @Test
+        fun `jj's real parse error for an ampersand maps to incorrect format`() {
+            classify(
+                2,
+                "error: invalid value 'a&b' for '<NAMES>...': Failed to parse bookmark name: Syntax error"
+            ) shouldBe "dialog.bookmark.create.error.incorrect.format"
         }
 
         @Test

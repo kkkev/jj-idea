@@ -13,6 +13,19 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.jj.message
+import `in`.kkkev.jjidea.jj.refNameSyntaxError
+
+/**
+ * Maps a failed `jj bookmark create|rename` to a message key (jj-idea-27b4, jj-idea-v6mt). Exit 2 is
+ * clap's own parse/usage error, e.g. `Failed to parse bookmark name` for `a&b`. jj exits 1 for nearly
+ * every runtime error, so "already exists" is read from stderr, never from the exit code alone.
+ */
+internal fun classifyBookmarkFailure(actionType: String, exitCode: Int, stderr: String) = when {
+    exitCode == 2 -> "dialog.bookmark.$actionType.error.incorrect.format"
+    stderr.contains("already exists", ignoreCase = true) -> "dialog.bookmark.$actionType.error.already.exists"
+    else -> "dialog.bookmark.$actionType.error.unknown"
+}
 
 abstract class BookmarkNameDialog(private val repo: JujutsuRepository, private val actionType: String) :
     DialogWrapper(repo.project) {
@@ -32,21 +45,33 @@ abstract class BookmarkNameDialog(private val repo: JujutsuRepository, private v
     override fun createCenterPanel() = panel {
         row(JujutsuBundle.message("dialog.bookmark.$actionType.input.message")) {
             cell(nameField).focused().columns(COLUMNS_MEDIUM)
+                .validationOnInput { validationMessage()?.let { msg -> error(msg) } }
         }
     }
 
     override fun continuousValidation() = true
 
     // Called when user clicks OK — return null if valid, error string if not
-    override fun doValidate() = when {
-        bookmark.isRemote -> "dialog.bookmark.$actionType.error.not.remote"
-
-        else -> failedNames[bookmark]
-    }?.let {
-        ValidationInfo(JujutsuBundle.message(it, bookmark), nameField)
+    private fun validationMessage(): String? {
+        val text = nameField.text
+        return when {
+            // Don't flag an untouched, empty field; OK is blocked in doOKAction.
+            text.isEmpty() -> null
+            bookmark.isRemote -> JujutsuBundle.message("dialog.bookmark.$actionType.error.not.remote", bookmark)
+            else -> refNameSyntaxError(text)?.message()
+                ?: failedNames[bookmark]?.let { JujutsuBundle.message(it, bookmark) }
+        }
     }
 
-    override fun doOKAction() = repo.createCommand { execute(this) }
+    // Also runs when OK is clicked; validationOnInput on the field gives the per-keystroke feedback.
+    override fun doValidate() = validationMessage()?.let { ValidationInfo(it, nameField) }
+
+    override fun doOKAction() {
+        if (nameField.text.isEmpty() || bookmark.isRemote || refNameSyntaxError(nameField.text) != null) return
+        runCommand()
+    }
+
+    private fun runCommand() = repo.createCommand { execute(this) }
         .onSuccess {
             invalidate()
             onSuccess()
@@ -57,16 +82,11 @@ abstract class BookmarkNameDialog(private val repo: JujutsuRepository, private v
             // stderr for the actual wording ("Bookmark already exists: <name>", verified against jj
             // 0.44) instead of trusting exitCode alone stops misattributing every other exit-1
             // failure as a name conflict. Exit 2 is reliably clap's own parse/usage error.
-            failedNames[bookmark] = when {
-                exitCode == 2 -> "dialog.bookmark.$actionType.error.incorrect.format"
-                stderr.contains(
-                    "already exists",
-                    ignoreCase = true
-                ) -> "dialog.bookmark.$actionType.error.already.exists"
-                else -> {
-                    log.warn("Failed to $actionType bookmark '${bookmark.name}': $stderr")
-                    "dialog.bookmark.$actionType.error.unknown"
-                }
+            // Note: a bare `exitCode` here would resolve to DialogWrapper.getExitCode(), not jj's.
+            val key = classifyBookmarkFailure(actionType, result.exitCode, stderr)
+            failedNames[bookmark] = key
+            if (key.endsWith(".unknown")) {
+                log.warn("Failed to $actionType bookmark '${bookmark.name}': $stderr")
             }
         }
         .executeAsync()

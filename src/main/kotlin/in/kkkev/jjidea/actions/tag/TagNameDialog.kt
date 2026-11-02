@@ -9,6 +9,8 @@ import com.intellij.ui.dsl.builder.panel
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Tag
+import `in`.kkkev.jjidea.jj.message
+import `in`.kkkev.jjidea.jj.refNameSyntaxError
 
 class TagNameDialog(
     private val repo: JujutsuRepository,
@@ -24,13 +26,22 @@ class TagNameDialog(
     override fun createCenterPanel() = panel {
         row(JujutsuBundle.message("dialog.tag.set.input.message")) {
             cell(nameField).focused().columns(COLUMNS_MEDIUM)
+                .validationOnInput { validationMessage()?.let { msg -> error(msg) } }
         }
     }
 
     override fun continuousValidation() = true
 
-    override fun doValidate() = nameField.text.takeIf { it.isBlank() }
-        ?.let { ValidationInfo(JujutsuBundle.message("dialog.tag.set.error.empty"), nameField) }
+    private fun validationMessage(): String? {
+        val name = nameField.text.trim()
+        return if (name.isEmpty()) {
+            JujutsuBundle.message("dialog.tag.set.error.empty")
+        } else {
+            refNameSyntaxError(name)?.message()
+        }
+    }
+
+    override fun doValidate() = validationMessage()?.let { ValidationInfo(it, nameField) }
 
     override fun doOKAction() {
         onName(Tag(nameField.text.trim()))
