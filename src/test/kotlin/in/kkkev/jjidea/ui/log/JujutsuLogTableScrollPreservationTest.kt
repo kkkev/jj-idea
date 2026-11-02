@@ -267,4 +267,20 @@ class JujutsuLogTableScrollPreservationTest {
         table.setEntries(rows(wcIndex = 45))
         scrollPane.viewport.viewPosition shouldBe java.awt.Point(0, 0)
     }
+
+    @Test
+    fun `selection requested during a refresh that changes nothing is applied once it settles`() {
+        val ids = (0 until 50).map { "e%03d".format(it) }
+        val (table, _) = tableInScrollPane(ids.map { entry(it) })
+
+        table.markRefreshPending()
+        table.requestSelection(ChangeKey(repo, ChangeId("e030", "e030", null)))
+        table.refreshSettledUnchanged()
+
+        table.selectedRow shouldBe 30
+
+        // No longer deferring: a later request resolves at once (jj-idea-7rxm).
+        table.requestSelection(ChangeKey(repo, ChangeId("e005", "e005", null)))
+        table.selectedRow shouldBe 5
+    }
 }

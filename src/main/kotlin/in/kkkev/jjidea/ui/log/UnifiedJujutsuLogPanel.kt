@@ -370,6 +370,11 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         if (firstLoad) queue.flush()
     }
 
+    override fun onRefreshUnchanged() {
+        if (Disposer.isDisposed(this) || project.isDisposed) return
+        logTable.refreshSettledUnchanged()
+    }
+
     private fun applyData(newData: UnifiedJujutsuLogDataLoader.Data) {
         if (Disposer.isDisposed(this) || project.isDisposed) return
         applyCount++

@@ -561,7 +561,11 @@ class UnifiedJujutsuLogDataLoader(
             fastMergeAndNotify(delta!!, current!!, correctionsByRepo)
         } else {
             // null = nothing changed since the last notify (jj-idea-43qg): no relayout, no table apply.
-            fullMergeAndNotify(correctionsByRepo) ?: return@withLock
+            // The panel still has to learn the refresh is over, or its deferred selections never run (jj-idea-7rxm).
+            fullMergeAndNotify(correctionsByRepo) ?: run {
+                runLater { panel.onRefreshUnchanged() }
+                return@withLock
+            }
         }
         // jj-idea-2570.8: start fetching the emptiness of any immutable merges that just landed (the template skips
         // it), so the "calculating" rows resolve without waiting to be painted. Only the new rows on an append.

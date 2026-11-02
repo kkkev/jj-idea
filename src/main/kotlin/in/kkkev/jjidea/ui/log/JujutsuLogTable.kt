@@ -148,6 +148,18 @@ class JujutsuLogTable(
         refreshPending = true
     }
 
+    /**
+     * Call when a refresh finished without producing new rows (the merged set was unchanged, so no
+     * [setEntries] follows). Lifts the [markRefreshPending] deferral - otherwise it would stay set
+     * forever and silently swallow every later [requestSelection] - and replays a selection that was
+     * deferred meanwhile (jj-idea-7rxm).
+     */
+    fun refreshSettledUnchanged() {
+        if (!refreshPending) return
+        refreshPending = false
+        pendingSelection?.let(::requestSelection)
+    }
+
     fun requestSelection(changeKey: ChangeKey) {
         // Try immediate selection from current model data (e.g., annotation click with no pending refresh).
         // Stored as pending until found, so setEntries() can apply it once a refresh/expansion lands it.

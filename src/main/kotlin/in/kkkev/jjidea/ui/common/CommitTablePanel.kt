@@ -553,6 +553,9 @@ abstract class CommitTablePanel<D>(
 
     abstract fun onDataLoaded(newData: D)
 
+    /** A refresh completed with nothing to apply (data identical to what is shown). */
+    open fun onRefreshUnchanged() {}
+
     abstract fun updateTableStuff()
 
     inner class ToggleColumnAction(
