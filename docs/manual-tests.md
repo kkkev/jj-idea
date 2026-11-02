@@ -392,7 +392,7 @@ Use FX-STRESS.
 - [ ] Typing `heads(` gives the whole box a red outline and a one-line hover message (e.g. "Failed to parse revset: Syntax error: expected … (column 7)") with no `|` snippet and none of the scope/chip terms. The status bar shows the same short text as "Search revset error", and the previous rows stay (the log is not emptied). Fixing the text clears the outline and tooltip
 - [ ] With a bad *scope* and a valid search, the search box is not outlined (the status bar names the error)
 - [ ] Narrowing the tool window until the box would leave only a few characters to type collapses it to a compact chip (search icon + text, red text on an error). Clicking the chip pops out the full box with the toggles; Enter applies and closes it, Esc closes it, and the text and toggles are kept. Widening brings the inline box back. Clicking into a narrower-than-popup inline box pops it out over the box at the same height (not a row below it); with the box already as wide as the popup (~460px), clicking in edits inline with no popup (GitHub #153)
-- [ ] The Rebase, Squash Into… and Move Bookmark to Change pickers and file history have no revset toggle
+- [ ] File history has no revset toggle. The Rebase, Duplicate Onto…, Squash Into… and Move Bookmark to Change pickers do (GitHub #155): in revset mode, typing `@- | @--` filters nothing until **Enter**, which runs one `jj log` and narrows the list to its matches (including commits older than the loaded log); a bad revset shows the red outline and a status error and leaves the list as it was. Up/Down in the box still move through the Move Bookmark list, except while a completion popup is open
 
 #### Search by Git commit hash
 
@@ -463,7 +463,7 @@ Needs a throwaway user config (`JJ_CONFIG`) or remove `revset-aliases.mine` afte
 - [ ] An invalid revset (`ancestors(trunk(), 2) )` with a stray `)`) entered in the Scope popup with Enter turns the field red with a wrapped error balloon (not a truncated label). Via **Save as alias…** + OK the dialog refuses with "Not a valid revset, alias not saved: …" and no new entry appears in `jj config list revset-aliases`. The dialog's Revset field is editable: fix the expression there and OK saves it
 - [ ] **Repository config** in a multi-repo project writes the alias to each repo's own config only
 - [ ] Editing the alias in the config file, then changing another filter, makes the tab follow the new definition
-- [ ] In the search box with revset mode on, a **Save as alias…** toolbar button appears, disabled while the box is empty and when revset mode is off. With text it opens the same dialog, and after saving the box holds the alias name and is filtered by it. The Rebase, Squash Into…, Move Bookmark to Change pickers and file history have no such button
+- [ ] In the search box with revset mode on, a **Save as alias…** toolbar button appears, disabled while the box is empty and when revset mode is off. With text it opens the same dialog, and after saving the box holds the alias name and is filtered by it. The Rebase, Duplicate Onto…, Squash Into…, Move Bookmark to Change pickers and file history have no such button
 
 #### Revset highlighting, completion and history
 
@@ -486,7 +486,7 @@ The Scope popup and the search box (in revset mode) are editor-based fields: the
 - [ ] Search box in revset mode: an invalid revset gets the red outline and the underline at jj's column (relative to the search text alone, not the scope), the border is red exactly once (no second outline inside it), and half-formed revsets while typing log no `CliExecutor … failed` WARN lines. Accepting a completion changes the text, so the log re-filters a moment later, which is expected
 - [ ] Search box wide enough to be inline: clicking into it (or Tab), in text mode and revset mode alike, pops it out into the wide popup under a chip showing the same text, with the caret in the field; typing (and in revset mode, completion and history) work there. Toggling revset mode inside the popup keeps it popped out. Clicking away or pressing Esc closes the popup and returns to the inline box with the text intact; after Esc, focus returning to the box does **not** pop it out again, while clicking the box does
 - [ ] Squeezing the log until the box collapses to its chip, then clicking the chip pops out the full field with the toggles; completion and history work inside the popup (the history list opens below the popup, not behind it) and Esc closes it
-- [ ] The Rebase, Squash Into… and Move Bookmark to Change pickers and file history keep their plain search box (no colours, no completion)
+- [ ] The Rebase, Duplicate Onto…, Squash Into… and Move Bookmark to Change pickers have the highlighted, completing revset box in revset mode and a plain box otherwise, with no history icon; file history keeps its plain search box (no colours, no completion)
 
 #### Tab scope (Scope chip)
 

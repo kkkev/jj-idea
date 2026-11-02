@@ -35,6 +35,8 @@ import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.event.FocusAdapter
 import java.awt.event.FocusEvent
+import java.awt.event.KeyAdapter
+import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JComponent
@@ -177,6 +179,9 @@ class LogSearchField(
     }
 
     private var error: String? = null
+
+    /** Calls [handler] with -1 / +1 when Up / Down is pressed in the box (not while a completion list is open). */
+    fun setNavigationHandler(handler: (delta: Int) -> Unit) = input.onNavigate(handler)
 
     /** Current search text. Setting it fires [onFilterChanged] the same as a keystroke would. */
     var text: String
@@ -459,6 +464,9 @@ private interface SearchInput {
     fun addCurrentTextToHistory()
 
     fun setError(message: String?, position: Pair<Int, Int>?)
+
+    /** Up (-1) / Down (+1) pressed in the box, e.g. to move through a list beside it. */
+    fun onNavigate(listener: (delta: Int) -> Unit)
 }
 
 private class PlainInput(historyKey: String?, popupAnchor: () -> Component?) : SearchInput {
@@ -502,6 +510,19 @@ private class PlainInput(historyKey: String?, popupAnchor: () -> Component?) : S
     override fun onActivated(listener: () -> Unit) = Unit
 
     override fun addCurrentTextToHistory() = searchTextField.addCurrentTextToHistory()
+
+    override fun onNavigate(listener: (delta: Int) -> Unit) {
+        searchTextField.textEditor.addKeyListener(
+            object : KeyAdapter() {
+                override fun keyPressed(e: KeyEvent) {
+                    when (e.keyCode) {
+                        KeyEvent.VK_DOWN -> listener(1).also { e.consume() }
+                        KeyEvent.VK_UP -> listener(-1).also { e.consume() }
+                    }
+                }
+            }
+        )
+    }
 
     override fun setError(message: String?, position: Pair<Int, Int>?) {
         wrapper?.putClientProperty("JComponent.outline", if (message != null) "error" else null)
@@ -570,6 +591,11 @@ private class RevsetInput(
     }
 
     override fun addCurrentTextToHistory() = revsetField.addCurrentTextToHistory()
+
+    override fun onNavigate(listener: (delta: Int) -> Unit) {
+        revsetField.onUp = { listener(-1) }
+        revsetField.onDown = { listener(1) }
+    }
 
     // The editor's own border is the only decoration: blue while focused, red on error.
     override fun setError(message: String?, position: Pair<Int, Int>?) = revsetField.setError(message, position)

@@ -3,11 +3,14 @@ package `in`.kkkev.jjidea.ui.components
 import com.intellij.codeInsight.lookup.LookupManager
 import com.intellij.icons.AllIcons
 import com.intellij.ide.util.PropertiesComponent
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonShortcuts
 import com.intellij.openapi.actionSystem.ShortcutSet
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.HighlighterColors
 import com.intellij.openapi.editor.colors.CodeInsightColors
+import com.intellij.openapi.editor.colors.EditorColorsListener
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
@@ -23,6 +26,7 @@ import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.ListSeparator
 import com.intellij.openapi.ui.popup.PopupStep
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep
+import com.intellij.openapi.util.Disposer
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.textCompletion.TextFieldWithCompletion
 import com.intellij.util.ui.JBUI
@@ -109,6 +113,10 @@ class RevsetTextField(
 
     /** Called on Escape when no completion popup is showing; the editor otherwise swallows the key. */
     var onEscape: (() -> Unit)? = null
+
+    /** Called on Up / Down when no completion popup is showing, e.g. to move through a list beside the field. */
+    var onUp: (() -> Unit)? = null
+    var onDown: (() -> Unit)? = null
 
     /** The owner's current switches, stored with each history entry (null: this field has none). */
     var historyModes: () -> String? = { null }
@@ -311,6 +319,26 @@ class RevsetTextField(
         clearButton.isVisible = text.isNotEmpty()
     }
 
+    private var schemeSubscription: Disposable? = null
+
+    // The highlighter holds the scheme's text attributes as they were when it was built, so without this a
+    // switch between light and dark (e.g. the OS theme changing while a dialog is open) leaves the text in the
+    // old scheme's colour - black on a dark background.
+    override fun addNotify() {
+        super.addNotify()
+        val subscription = Disposer.newDisposable("RevsetTextField colour scheme")
+        schemeSubscription = subscription
+        ApplicationManager.getApplication().messageBus.connect(subscription)
+            .subscribe(EditorColorsManager.TOPIC, EditorColorsListener { applyHighlighter() })
+        applyHighlighter()
+    }
+
+    override fun removeNotify() {
+        schemeSubscription?.let { Disposer.dispose(it) }
+        schemeSubscription = null
+        super.removeNotify()
+    }
+
     private fun applyHighlighter() {
         editorEx?.let {
             val scheme = EditorColorsManager.getInstance().globalScheme
@@ -337,6 +365,10 @@ class RevsetTextField(
         }
         if (!multiline) register(CommonShortcuts.ENTER) { onEnter }
         register(CommonShortcuts.ESCAPE) { onEscape }
+        if (!multiline) {
+            register(CommonShortcuts.getMoveUp()) { onUp }
+            register(CommonShortcuts.getMoveDown()) { onDown }
+        }
     }
 
     /** One `jj config list` per repo per focus gain, off the EDT; never per keystroke. */

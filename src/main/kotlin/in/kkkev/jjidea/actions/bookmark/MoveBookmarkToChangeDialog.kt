@@ -14,6 +14,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.cli.TemplateParts
@@ -24,8 +25,10 @@ import `in`.kkkev.jjidea.ui.components.LogSearchField
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.ui.components.appendSummary
 import `in`.kkkev.jjidea.ui.components.icon
+import `in`.kkkev.jjidea.ui.log.conciseRevsetError
 import `in`.kkkev.jjidea.ui.log.entryCanvas
 import `in`.kkkev.jjidea.ui.log.fetchSearchResults
+import `in`.kkkev.jjidea.ui.log.revsetErrorPosition
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -46,6 +49,7 @@ import javax.swing.JSeparator
 import javax.swing.ListCellRenderer
 import javax.swing.ListSelectionModel
 import javax.swing.SwingConstants
+import javax.swing.SwingUtilities
 
 private sealed class ChangeItem {
     data object EmptyState : ChangeItem()
@@ -151,10 +155,19 @@ class MoveBookmarkToChangeDialog(
     /** Grows via [searchWholeRepo] (jj-idea-tq4b) as off-window commits are found and classified. */
     private var classified: List<Pair<LogEntry, MoveDirection>> = initialClassified
 
-    private val searchField = LogSearchField(
+    /**
+     * Ids matched by the last revset applied with Enter (jj-idea-cl4d); null when not in revset mode or none
+     * applied yet. Editing the revset keeps the last result until the next Enter.
+     */
+    private var revsetMatches: Set<ChangeId>? = null
+
+    private val searchField: LogSearchField = LogSearchField(
         placeholder = JujutsuBundle.message("dialog.bookmark.moveTo.search.emptytext"),
-        onFilterChanged = { rebuildList() },
-        onSubmitted = { searchWholeRepo() }
+        revsetModeAvailable = true,
+        onFilterChanged = { onSearchChanged() },
+        onSubmitted = { searchWholeRepo() },
+        project = repo.project,
+        repos = { listOf(repo) }
     )
 
     private val statusLabel = JBLabel().apply { isVisible = false }
@@ -186,20 +199,7 @@ class MoveBookmarkToChangeDialog(
 
         // Up/Down navigate the list from the search field; Enter is handled by LogSearchField
         // itself (jj-idea-lpbv/jj-idea-tq4b: it now runs a whole-repo search, not dialog OK).
-        searchField.textEditor.addKeyListener(object : KeyAdapter() {
-            override fun keyPressed(e: KeyEvent) {
-                when (e.keyCode) {
-                    KeyEvent.VK_DOWN -> {
-                        navigateList(1)
-                        e.consume()
-                    }
-                    KeyEvent.VK_UP -> {
-                        navigateList(-1)
-                        e.consume()
-                    }
-                }
-            }
-        })
+        searchField.setNavigationHandler(::navigateList)
 
         list.addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
@@ -266,9 +266,48 @@ class MoveBookmarkToChangeDialog(
         super.doOKAction()
     }
 
+    /**
+     * What [rebuildList] last filtered by: the text and toggles in text mode, the applied revset result in
+     * revset mode. Typing in revset mode doesn't change it until Enter, and rebuilding the whole [list] on the
+     * EDT for an identical result made the box slow to focus and to type in.
+     */
+    private var shownFilter: Any? = null
+
+    // The effective filter, so that switching modes with nothing to filter by (the common case) is not a change.
+    private fun currentFilter(): Any = when {
+        searchField.revsetMode -> revsetMatches ?: NO_FILTER
+        searchField.text.isBlank() -> NO_FILTER
+        else -> listOf(searchField.text, searchField.useRegex, searchField.matchCase, searchField.matchWholeWords)
+    }
+
+    private fun onSearchChanged() {
+        if (!searchField.revsetMode) {
+            revsetMatches = null
+        } else if (searchField.text.isBlank()) {
+            // Typing over selected text empties the box for an instant (delete, then insert), which must not
+            // throw the applied result away; only a box that is still empty once the event settles does.
+            SwingUtilities.invokeLater {
+                if (!isDisposed && searchField.revsetMode && searchField.text.isBlank() && revsetMatches != null) {
+                    revsetMatches = null
+                    rebuildListIfFilterChanged()
+                }
+            }
+        }
+        searchField.setError(null)
+        rebuildListIfFilterChanged()
+    }
+
+    private fun rebuildListIfFilterChanged() {
+        if (currentFilter() != shownFilter) rebuildList()
+    }
+
     private fun rebuildList() {
+        shownFilter = currentFilter()
         val matcher = searchField.matcher()
-        val filtered = if (matcher == null) classified else classified.filter { matcher.matches(it.first) }
+        val revset = revsetMatches
+        val filtered = classified.filter {
+            (matcher?.matches(it.first) ?: true) && (revset?.contains(it.first.id) ?: true)
+        }
 
         val resolves = filtered.filter { it.second == MoveDirection.RESOLVE }
         val forwards = filtered.filter { it.second == MoveDirection.FORWARD }
@@ -304,6 +343,10 @@ class MoveBookmarkToChangeDialog(
      */
     private fun searchWholeRepo() {
         // Read on the EDT, before going to the background: the field's text and toggles aren't thread-safe.
+        if (searchField.revsetMode) {
+            applyRevset()
+            return
+        }
         val withIds = searchField.revset() ?: return
         val textOnly = searchField.revset(matchIds = false)
         val settings = JujutsuSettings.getInstance(repo.project)
@@ -330,6 +373,44 @@ class MoveBookmarkToChangeDialog(
                     JujutsuBundle.message("log.status.search.found", newlyClassified.size, searchField.text)
                 } else {
                     JujutsuBundle.message("log.status.search.none", searchField.text)
+                }
+                statusLabel.isVisible = true
+            }
+        }
+    }
+
+    /**
+     * Revset mode's Enter (jj-idea-cl4d): one `jj log -r <revset>` capped at the log change limit, plus the one
+     * descendant query in [classifyAgainstBookmark] only when it finds commits not yet classified. The list then
+     * narrows to the revset's matches. A revset jj rejects is shown on the field and leaves the list as it was.
+     */
+    private fun applyRevset() {
+        val text = searchField.text.trim().takeIf { it.isNotEmpty() } ?: return
+        val limit = JujutsuSettings.getInstance(repo.project).logChangeLimit(repo)
+        repo.runRecoverableInBackground(retry = ::applyRevset, modalityState = ModalityState.any()) {
+            val result = repo.logService.getLog(revset = Expression(text), limit = limit, quiet = true)
+            val found = result.getOrNull()
+            val newlyClassified = if (found == null) {
+                emptyList()
+            } else {
+                val alreadyKnown =
+                    classified.mapTo(mutableSetOf()) { it.first.id } + listOfNotNull(currentTargets.singleOrNull())
+                val newEntries = found.filter { it.id !in alreadyKnown }
+                if (newEntries.isNotEmpty()) repo.logCache.store(newEntries)
+                classifyAgainstBookmark(repo, currentTargets, newEntries)
+            }
+            runLater {
+                if (isDisposed) return@runLater
+                if (found == null) {
+                    val message = result.exceptionOrNull()?.message.orEmpty()
+                    searchField.setError(conciseRevsetError(message), revsetErrorPosition(message))
+                    statusLabel.text = JujutsuBundle.message("log.status.revset.error", conciseRevsetError(message))
+                } else {
+                    searchField.setError(null)
+                    classified = classified + newlyClassified
+                    revsetMatches = found.mapTo(HashSet()) { it.id }
+                    rebuildList()
+                    statusLabel.text = JujutsuBundle.message("log.status.picker.revset.matched", found.size)
                 }
                 statusLabel.isVisible = true
             }
@@ -380,6 +461,8 @@ class MoveBookmarkToChangeDialog(
     }
 
     companion object {
+        private val NO_FILTER = Any()
+
         fun show(repo: JujutsuRepository, bookmark: Bookmark, onSelected: (ChangeId, Boolean) -> Unit) {
             repo.runRecoverableInBackground(retry = { show(repo, bookmark, onSelected) }) {
                 val currentTargets = currentBookmarkTargets(repo, bookmark)

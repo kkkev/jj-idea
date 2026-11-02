@@ -48,6 +48,7 @@ class CommitPickerPanelTest {
         var getLogCallCount = 0
             private set
         var searchResult: List<LogEntry> = emptyList()
+        var searchFailure: Throwable? = null
         val repo: JujutsuRepository = mockk(relaxed = true)
 
         init {
@@ -61,7 +62,7 @@ class CommitPickerPanelTest {
                     quiet: Boolean
                 ): Result<List<LogEntry>> {
                     getLogCallCount++
-                    return Result.success(searchResult)
+                    return searchFailure?.let { Result.failure(it) } ?: Result.success(searchResult)
                 }
             }
             every { repo.logCache } returns logCache
@@ -208,7 +209,7 @@ class CommitPickerPanelTest {
         settle(picker)
         fake.getLogCallCount shouldBe 0
 
-        picker.searchField.textEditor.postActionEvent()
+        picker.searchField.submit()
         waitUntil { picker.entries.size > 1 }
         settle(picker)
 
@@ -233,7 +234,7 @@ class CommitPickerPanelTest {
         settle(picker)
         picker.rowCount shouldBe 0 // not in the loaded window yet
 
-        picker.searchField.textEditor.postActionEvent()
+        picker.searchField.submit()
         waitUntil { picker.rowCount > 0 }
 
         picker.rowCount shouldBe 1
@@ -287,5 +288,154 @@ class CommitPickerPanelTest {
         settle(picker)
 
         picker.selectedIds().map { it.full } shouldBe listOf("bbbbbb")
+    }
+
+    @Test
+    fun `revset mode runs one jj log per Enter and narrows rows to its matches (jj-idea-cl4d)`() {
+        val fake = FakeRepo()
+        val a = entry(fake.repo, "aaaaaa", "alpha")
+        val b = entry(fake.repo, "bbbbbb", "beta")
+        val offWindow = entry(fake.repo, "cccccc", "gamma")
+        every { fake.repo.logCache.all } returns listOf(a, b)
+        fake.searchResult = listOf(b, offWindow)
+
+        val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
+        waitForInitialLoad(picker)
+        picker.reload { true }
+        settle(picker)
+
+        picker.searchField.revsetMode = true
+        picker.searchField.text = "bbbbbb | cccccc"
+        settle(picker)
+        fake.getLogCallCount shouldBe 0 // typing alone never runs jj
+        picker.rowCount shouldBe 2 // not applied yet
+
+        picker.searchField.submit()
+        waitUntil { picker.rowCount == 2 && picker.entries.size == 3 }
+        settle(picker)
+
+        fake.getLogCallCount shouldBe 1
+        (0 until picker.rowCount).map { picker.entryAt(it)?.id?.full }.toSet() shouldBe setOf("bbbbbb", "cccccc")
+
+        // Editing keeps the applied result without another jj call.
+        picker.searchField.text = "bbbbbb | cccccc | aaaaaa"
+        settle(picker)
+        fake.getLogCallCount shouldBe 1
+        picker.rowCount shouldBe 2
+
+        picker.searchField.revsetMode = false
+        picker.searchField.text = ""
+        settle(picker)
+        picker.rowCount shouldBe 3
+    }
+
+    @Test
+    fun `a revset jj rejects leaves the rows and flags the field`() {
+        val fake = FakeRepo()
+        every { fake.repo.logCache.all } returns listOf(entry(fake.repo, "aaaaaa"), entry(fake.repo, "bbbbbb"))
+        fake.searchFailure = RuntimeException("Error from jj log: Revision `zz` doesn't exist")
+
+        val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
+        waitForInitialLoad(picker)
+        picker.searchField.revsetMode = true
+        picker.searchField.text = "zz"
+        settle(picker)
+
+        picker.searchField.submit()
+        waitUntil { fake.getLogCallCount > 0 }
+        UIUtil.dispatchAllInvocationEvents()
+        settle(picker)
+
+        fake.getLogCallCount shouldBe 1
+        picker.rowCount shouldBe 2
+    }
+
+    @Test
+    fun `a pick hidden by the search stays selected and a new pick adds to it (jj-idea-cl4d)`() {
+        val fake = FakeRepo()
+        val a = entry(fake.repo, "aaaaaa", "alpha")
+        val b = entry(fake.repo, "bbbbbb", "beta")
+        every { fake.repo.logCache.all } returns listOf(a, b)
+
+        val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
+        waitForInitialLoad(picker)
+        picker.reload { true }
+        settle(picker)
+        picker.table.setRowSelectionInterval(0, 0) // alpha
+
+        picker.searchField.text = "beta"
+        settle(picker)
+        picker.rowCount shouldBe 1
+        picker.table.addRowSelectionInterval(0, 0)
+
+        picker.selectedIds().map { it.full }.toSet() shouldBe setOf("aaaaaa", "bbbbbb")
+
+        picker.searchField.text = ""
+        settle(picker)
+        picker.table.selectedRows.toList() shouldBe listOf(0, 1)
+    }
+
+    @Test
+    fun `a pick the predicate rejects is dropped even while hidden by the search`() {
+        val fake = FakeRepo()
+        val a = entry(fake.repo, "aaaaaa", "alpha")
+        val b = entry(fake.repo, "bbbbbb", "beta")
+        every { fake.repo.logCache.all } returns listOf(a, b)
+
+        val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
+        waitForInitialLoad(picker)
+        picker.reload { true }
+        settle(picker)
+        picker.table.setRowSelectionInterval(0, 0)
+        picker.searchField.text = "beta"
+        settle(picker)
+
+        picker.reload { it.id.full != "aaaaaa" }
+        settle(picker)
+
+        picker.selectedIds() shouldBe emptySet()
+    }
+
+    @Test
+    fun `a single-select pick replaces an earlier one`() {
+        val fake = FakeRepo()
+        every { fake.repo.logCache.all } returns listOf(entry(fake.repo, "aaaaaa"), entry(fake.repo, "bbbbbb"))
+
+        val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = false)
+        waitForInitialLoad(picker)
+        picker.table.setRowSelectionInterval(0, 0)
+        picker.table.setRowSelectionInterval(1, 1)
+
+        picker.selectedIds().map { it.full } shouldBe listOf("bbbbbb")
+    }
+
+    @Test
+    fun `typing over a revset keeps the applied result, clearing the box drops it`() {
+        val fake = FakeRepo()
+        val a = entry(fake.repo, "aaaaaa", "alpha")
+        val b = entry(fake.repo, "bbbbbb", "beta")
+        every { fake.repo.logCache.all } returns listOf(a, b)
+        fake.searchResult = listOf(b)
+
+        val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
+        waitForInitialLoad(picker)
+        picker.searchField.revsetMode = true
+        picker.searchField.text = "bbbbbb"
+        picker.searchField.submit()
+        waitUntil { picker.rowCount == 1 }
+        settle(picker)
+
+        // Typing over the selection: the box is empty for an instant, then holds the new text.
+        picker.searchField.text = ""
+        picker.searchField.text = "bogus("
+        UIUtil.dispatchAllInvocationEvents()
+        settle(picker)
+        picker.rowCount shouldBe 1
+
+        // A box left empty restores the full list.
+        picker.searchField.text = ""
+        UIUtil.dispatchAllInvocationEvents()
+        settle(picker)
+        picker.rowCount shouldBe 2
     }
 }
