@@ -173,6 +173,8 @@ class CommitDialog(
         }
 
         updateSummary()
+        // The tree applies the initial ticks asynchronously, so count them again once it has.
+        fileSelection.changesTree.invokeAfterRefresh { updateSummary() }
         init()
     }
 

@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.actions.change
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.FilePath
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.diffedit.DiffEditTool
@@ -17,6 +18,7 @@ import `in`.kkkev.jjidea.ui.commit.CommitSpec
 import `in`.kkkev.jjidea.ui.common.HunkSelection
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.relativeTo
 
 private val commitLog = Logger.getInstance("in.kkkev.jjidea.actions.change.commitAction")
@@ -31,10 +33,13 @@ private val commitLog = Logger.getInstance("in.kkkev.jjidea.actions.change.commi
  *
  * Ticked files stay in [entry] (which must be the working copy - `jj commit` has no `-r`), and
  * everything else moves to a new working-copy change. After committing, selects [entry].
+ *
+ * The dialog starts with [preSelectedFiles] ticked, or with every file ticked when null or empty.
  */
 fun commitAction(
     project: Project,
-    entry: LogEntry?
+    entry: LogEntry?,
+    preSelectedFiles: Set<FilePath>? = null
 ) = nullAndDumbAwareAction(
     entry,
     "log.action.commit",
@@ -45,7 +50,8 @@ fun commitAction(
             val changes = ChangeService.loadChanges(target)
 
             runLater {
-                val dialog = CommitDialog(project, target, changes)
+                val selected = preSelectedFiles?.takeIf { it.isNotEmpty() } ?: changes.map { it.filePath }.toSet()
+                val dialog = CommitDialog(project, target, changes, preSelectedFiles = selected)
                 if (!dialog.showAndGet()) return@runLater
 
                 val spec = dialog.result ?: return@runLater
