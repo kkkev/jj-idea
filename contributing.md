@@ -645,7 +645,8 @@ Standard push sequence. The pre-push gate (`scripts/pre-push.sh`, ~10–15 min) 
 - `jj verify [REV]` runs the gate on REV's content (default `@`, or `@-` if `@` is empty) in a
   separate lane-specific workspace (`verify-<lane>`, e.g. `verify-lane2`, in `<checkout>-verify`),
   created on first use, and raises a notification when it
-  finishes. It records a pass/fail stamp keyed by the tree, so re-describing or rebasing
+  finishes. The workspace is forgotten and its scratch change abandoned after each run (the
+  directory stays, for warm build caches), so no "verify scratch" changes accumulate. It records a pass/fail stamp keyed by the tree, so re-describing or rebasing
   without changing files keeps it valid. Use `--wait` to run in the foreground.
 - `jj ship` pushes `master` to `github` and `origin`, but only if `master`'s tree has a pass
   stamp, which makes it instant. Otherwise it refuses: run `jj verify master`, or `jj ship --now`
