@@ -315,6 +315,15 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         insertBefore: Revision?
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
+    override fun commit(filePaths: List<FilePath>, description: Description): CommandExecutor.CommandResult =
+        TODO("Not needed for integration tests")
+
+    override fun commitInteractive(
+        description: Description,
+        configArgs: List<String>,
+        tool: String
+    ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
+
     override fun gitRemoteList(): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 

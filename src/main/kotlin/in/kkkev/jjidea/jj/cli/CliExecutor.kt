@@ -569,6 +569,51 @@ internal fun splitInteractiveArgs(
     }
 )
 
+/**
+ * Build the argument list for `jj commit`.
+ *
+ * The selected fileset stays in the working-copy commit, which gets [description], and the
+ * remaining changes move to a new working-copy commit on top. Empty [filePaths] selects everything.
+ * Unlike `jj split`, there is no `-r`: `jj commit` always acts on the working copy.
+ */
+internal fun commitArgs(
+    filePaths: List<String> = emptyList(),
+    description: Description
+) = JjInvocation(
+    REVERSIBLE,
+    buildList {
+        add("commit")
+        add("--message=${description.actual}")
+        addAll(filePaths.map { it.toFileset() })
+    }
+)
+
+/**
+ * Build the full argument list for `jj commit --tool <tool>` (interactive diff-editor commit).
+ *
+ * [configArgs] are `NAME=VALUE` strings emitted as `--config NAME=VALUE` **before** the
+ * subcommand, since `--config` is a jj global option that must precede the subcommand.
+ * `--tool <tool>` implies `--interactive`, and no filesets are passed — the tool drives
+ * selection over the whole diff.
+ */
+internal fun commitInteractiveArgs(
+    description: Description,
+    configArgs: List<String> = emptyList(),
+    tool: String
+) = JjInvocation(
+    REVERSIBLE,
+    buildList {
+        // Global --config flags before the subcommand.
+        for (kv in configArgs) {
+            add("--config")
+            add(kv)
+        }
+        add("commit")
+        add("--message=${description.actual}")
+        add("--tool=$tool")
+    }
+)
+
 /** Build the argument list for `jj git clone`. IRREVERSIBLE - a remote operation, not repo-scope. */
 internal fun gitCloneArgs(source: String, destination: String, colocate: Boolean) = JjInvocation(
     IRREVERSIBLE,
@@ -1085,6 +1130,20 @@ class CliExecutor(
         tool: String,
         insertBefore: Revision?
     ) = execute(root, splitInteractiveArgs(revision, description, parallel, configArgs, tool, insertBefore))
+
+    override fun commit(
+        filePaths: List<FilePath>,
+        description: Description
+    ) = execute(
+        root,
+        commitArgs(filePaths.map { it.relativeTo(root!!) }, description)
+    )
+
+    override fun commitInteractive(
+        description: Description,
+        configArgs: List<String>,
+        tool: String
+    ) = execute(root, commitInteractiveArgs(description, configArgs, tool))
 
     override fun gitFetch(remote: Remote?, allRemotes: Boolean, ignoreWorkingCopy: Boolean) =
         execute(root, gitFetchArgs(remote, allRemotes, ignoreWorkingCopy), timeout = networkTimeout)

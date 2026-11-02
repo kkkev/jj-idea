@@ -69,7 +69,8 @@ fun fileChangeActionGroup(): DefaultActionGroup {
 
     group.addSeparator()
 
-    // Squash/split actions — self-filter based on entry mutability
+    // Commit/squash/split actions — Commit self-filters to the working copy, the rest on entry mutability
+    group.add(ManagedActions["Jujutsu.CommitFiles"])
     group.add(ManagedActions["Jujutsu.SquashFiles"])
     group.add(ManagedActions["Jujutsu.SquashIntoFiles"])
     group.add(ManagedActions["Jujutsu.SplitFiles"])

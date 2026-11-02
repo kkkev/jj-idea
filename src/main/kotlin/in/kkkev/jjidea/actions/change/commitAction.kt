@@ -1,129 +1,96 @@
 package `in`.kkkev.jjidea.actions.change
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.diffedit.DiffEditTool
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.jj.tellUser
+import `in`.kkkev.jjidea.ui.commit.CommitDialog
+import `in`.kkkev.jjidea.ui.commit.CommitSpec
 import `in`.kkkev.jjidea.ui.common.HunkSelection
-import `in`.kkkev.jjidea.ui.common.JujutsuIcons
-import `in`.kkkev.jjidea.ui.split.SplitDialog
-import `in`.kkkev.jjidea.ui.split.SplitSpec
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.relativeTo
 
-private val splitLog = Logger.getInstance("in.kkkev.jjidea.actions.change.splitAction")
+private val commitLog = Logger.getInstance("in.kkkev.jjidea.actions.change.commitAction")
 
 /**
- * Parse the remaining side's change ID from `jj split` stderr - only meaningful in the default
- * (no `-B`) mode, where the remaining side is a genuinely new commit whose ID isn't known until
- * `jj split` returns. In `insertBefore` (newParent) mode, the remaining side keeps the source's
- * own change ID, which is already known - see [onSplitSuccess].
+ * Commit action (GitHub #157). Loads changes on a background thread, opens a dialog to configure
+ * file selection, hunk selection and the description, then executes `jj commit`.
  *
- * Example output:
- * ```
- * Rebased 1 descendant commits
- * Selected changes : ppvwmllp bbaf2a0a first part
- * Remaining changes: ulwnpxxq 3fae5248 test commit
- * ```
- *
- * The "Remaining changes" line has the child's change ID.
- */
-internal fun parseRemainingChangeId(stderr: String): ChangeId? {
-    val regex = Regex("""Remaining changes: (\S+)""")
-    val match = regex.find(stderr) ?: return null
-    val idStr = match.groupValues[1]
-    return ChangeId(idStr, idStr)
-}
-
-/**
- * Split action. Loads changes on a background thread, opens a dialog to configure
- * file selection, hunk selection, descriptions, and options, then executes `jj split`.
- *
- * - If no file has partial hunk selection: uses the proven file-level `jj split` path
- *   (passes file paths; same as before the redesign).
+ * - If no file has partial hunk selection: uses the file-level `jj commit` path (passes file paths).
  * - If any file has partial hunk selection: builds a staging tree with the pre-computed
- *   first-commit content and drives `jj split --tool` via the diff-editor protocol.
+ *   committed content and drives `jj commit --tool` via the diff-editor protocol.
  *
- * If the child description differs from the original, chains a `jj describe` for the child.
- * After splitting, selects the original change ID.
- *
- * With [newParent] the dialog runs in "Split into New Parent" mode (`jj split -B`, GitHub #74/#132):
- * ticked files move to a new commit inserted before [entry], which keeps its own change ID. The
- * mode logic all lives in [SplitDialog] and [executeSplit]; this only selects it.
+ * Ticked files stay in [entry] (which must be the working copy - `jj commit` has no `-r`), and
+ * everything else moves to a new working-copy change. After committing, selects [entry].
  */
-fun splitAction(
+fun commitAction(
     project: Project,
-    entry: LogEntry?,
-    newParent: Boolean = false
+    entry: LogEntry?
 ) = nullAndDumbAwareAction(
     entry,
-    if (newParent) "log.action.split.intoParent" else "log.action.split",
-    JujutsuIcons.Split
+    "log.action.commit",
+    AllIcons.Actions.Commit
 ) {
     fun openDialog() {
         target.repo.runRecoverableInBackground(retry = ::openDialog) {
             val changes = ChangeService.loadChanges(target)
 
             runLater {
-                val dialog = SplitDialog(project, target, changes, newParent = newParent)
+                val dialog = CommitDialog(project, target, changes)
                 if (!dialog.showAndGet()) return@runLater
 
                 val spec = dialog.result ?: return@runLater
-                executeSplit(project, target, spec)
+                executeCommit(project, target, spec)
             }
         }
     }
     openDialog()
 }
 
-internal fun executeSplit(project: Project, target: LogEntry, spec: SplitSpec) {
+internal fun executeCommit(project: Project, target: LogEntry, spec: CommitSpec) {
     val hunkSelection = spec.hunkSelection
 
     if (hunkSelection == null) {
-        // Fast path: file-level split (no partial hunk selection).
-        executeSplitFilePaths(project, target, spec)
+        // Fast path: file-level commit (no partial hunk selection).
+        executeCommitFilePaths(project, target, spec)
     } else {
-        // Hunk-level path: build staging tree, run diff-editor-driven split.
-        executeSplitInteractive(project, target, spec, hunkSelection)
+        // Hunk-level path: build staging tree, run diff-editor-driven commit.
+        executeCommitInteractive(project, target, spec, hunkSelection)
     }
 }
 
-/** File-level split — unchanged from pre-hunk-level implementation. */
-private fun executeSplitFilePaths(project: Project, target: LogEntry, spec: SplitSpec) {
+/** File-level commit. */
+private fun executeCommitFilePaths(project: Project, target: LogEntry, spec: CommitSpec) {
     runInBackground {
-        val result = target.repo.commandExecutor.split(
-            spec.revision,
+        val result = target.repo.commandExecutor.commit(
             spec.filePaths,
-            spec.selectedDescription,
-            spec.parallel,
-            spec.insertBefore
+            spec.description
         )
 
         runLater {
             if (result !is CommandExecutor.CommandResult.Success) {
-                result.tellUser(target.repo, "log.action.split.error")
+                result.tellUser(target.repo, "log.action.commit.error")
                 return@runLater
             }
-            onSplitSuccess(project, target, spec, result.stderr)
+            onCommitSuccess(project, target, spec)
         }
     }
 }
 
-/** Hunk-level split via jj's diff-editor protocol. */
-private fun executeSplitInteractive(
+/** Hunk-level commit via jj's diff-editor protocol. */
+private fun executeCommitInteractive(
     project: Project,
     target: LogEntry,
-    spec: SplitSpec,
+    spec: CommitSpec,
     hunkSelection: HunkSelection
 ) {
     runInBackground {
@@ -137,62 +104,36 @@ private fun executeSplitInteractive(
         for (fp in spec.filePaths) {
             val relPath = fp.relativeTo(root)
             if (perFileContent[relPath] == null) {
-                val result = target.repo.commandExecutor.show(fp, spec.revision)
+                val result = target.repo.commandExecutor.show(fp, target.id)
                 if (result is CommandExecutor.CommandResult.Success) {
                     perFileContent[relPath] = result.stdout
                 } else {
-                    splitLog.warn("Could not fetch after-content for $relPath; file may be missing from first commit")
+                    commitLog.warn("Could not fetch after-content for $relPath; file may be missing from the commit")
                 }
             }
         }
 
         val result = DiffEditTool.withStagingTree(perFileContent, hunkSelection.deletedPaths) { configArgs, tool ->
-            target.repo.commandExecutor.splitInteractive(
-                revision = spec.revision,
-                description = spec.selectedDescription,
-                parallel = spec.parallel,
+            target.repo.commandExecutor.commitInteractive(
+                description = spec.description,
                 configArgs = configArgs,
-                tool = tool,
-                insertBefore = spec.insertBefore
+                tool = tool
             )
         }
 
         runLater {
             if (result !is CommandExecutor.CommandResult.Success) {
-                result.tellUser(target.repo, "log.action.split.error")
+                result.tellUser(target.repo, "log.action.commit.error")
                 return@runLater
             }
-            onSplitSuccess(project, target, spec, result.stderr)
+            onCommitSuccess(project, target, spec)
         }
     }
 }
 
-private fun onSplitSuccess(project: Project, target: LogEntry, spec: SplitSpec, stderr: String) {
-    project.saveDescriptionToHistory(spec.selectedDescription)
-
-    val remainingDesc = spec.remainingDescription
-    if (remainingDesc == null) {
-        target.repo.invalidate(select = target.id, vfsChanged = true)
-        splitLog.info("Split ${target.id}")
-        return
-    }
-
-    // newParent (-B) mode: the remaining side never moves off target.id (verified against real
-    // jj - see jj-idea-tkog), so its ID is already known and doesn't need parsing from stderr.
-    // Default mode: the remaining side is a genuinely new commit whose ID only stderr reveals.
-    val remainingId = if (spec.insertBefore != null) target.id else parseRemainingChangeId(stderr)
-
-    if (remainingId != null) {
-        target.repo.createCommand { describe(remainingDesc, remainingId) }
-            .onSuccess {
-                invalidate(select = target.id, vfsChanged = true)
-                project.saveDescriptionToHistory(remainingDesc)
-                splitLog.info("Split ${target.id} and described remaining $remainingId")
-            }
-            .onFailure { tellUser("log.action.split.error") }
-            .executeAsync()
-    } else {
-        splitLog.warn("Could not parse remaining change ID from split output: $stderr")
-        target.repo.invalidate(select = target.id, vfsChanged = true)
-    }
+private fun onCommitSuccess(project: Project, target: LogEntry, spec: CommitSpec) {
+    project.saveDescriptionToHistory(spec.description)
+    // The committed side keeps target.id; the remaining changes are in a new working copy.
+    target.repo.invalidate(select = target.id, vfsChanged = true)
+    commitLog.info("Committed ${target.id}")
 }

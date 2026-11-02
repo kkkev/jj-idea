@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui.split
+package `in`.kkkev.jjidea.ui.commit
 
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.vcs.LocalFilePath
@@ -19,7 +19,6 @@ import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
-import io.kotest.matchers.string.shouldNotContain
 import io.mockk.mockk
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -27,140 +26,37 @@ import org.junit.jupiter.api.Test
 @Tag("platform")
 @TestApplication
 @RunInEdt
-class SplitDialogTest {
+class CommitDialogTest {
     private val project = projectFixture()
 
     @Test
-    fun `parent description pre-populated with source description`() {
+    fun `description pre-populated with source description`() {
         val source = createEntry("src1", description = "source desc")
-        val dialog = SplitDialog(project.get(), source, emptyList())
+        val dialog = CommitDialog(project.get(), source, emptyList())
 
-        dialog.parentDescriptionText shouldBe "source desc"
-        disposeDialog(dialog)
-    }
-
-    @Test
-    fun `child description pre-populated with source description`() {
-        val source = createEntry("src1", description = "source desc")
-        val dialog = SplitDialog(project.get(), source, emptyList())
-
-        dialog.childDescriptionText shouldBe "source desc"
+        dialog.descriptionText shouldBe "source desc"
         disposeDialog(dialog)
     }
 
     @Test
     fun `description empty when source empty`() {
         val source = createEntry("src1", description = "")
-        val dialog = SplitDialog(project.get(), source, emptyList())
+        val dialog = CommitDialog(project.get(), source, emptyList())
 
-        dialog.parentDescriptionText shouldBe ""
-        dialog.childDescriptionText shouldBe ""
+        dialog.descriptionText shouldBe ""
         disposeDialog(dialog)
     }
 
+    // The note is an HTML pane (IconAwareHtmlPane), which wraps instead of reporting its preferred
+    // width as whatever a single unwrapped line needs (see SplitDialogTest).
     @Test
-    fun `parallel checkbox defaults to unchecked`() {
+    fun `note wraps instead of forcing a wide preferred size`() {
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList())
+        val dialog = CommitDialog(project.get(), source, emptyList())
 
-        dialog.parallelCheckBox.isSelected shouldBe false
-        disposeDialog(dialog)
-    }
-
-    // Identity-first wording is deliberately mode-invariant, and now uses one consistent noun
-    // pair ("existing commit" / "new commit") everywhere - description labels, preview titles,
-    // summary, hunk picker - instead of "(keeps change ID)" clashing with "New commit" as if they
-    // were different parts of speech (jj-idea-8khi follow-up, GitHub #101 UX). One label per
-    // description editor, not a header plus a sub-label: the two used to repeat the same
-    // "new commit"/"stays" framing.
-    @Test
-    fun `dynamic labels stay identity-first when parallel toggled, only the parenthetical changes`() {
-        val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList())
-
-        // Default: child mode
-        dialog.parentHeaderLabel.text shouldContain "Description for existing commit"
-        dialog.parentHeaderLabel.text shouldContain source.id.short
-        dialog.childHeaderLabel.text shouldContain "Description for new commit"
-        dialog.childHeaderLabel.text shouldContain "child of"
-
-        // Toggle to parallel
-        dialog.parallelCheckBox.isSelected = true
-        dialog.parallelCheckBox.actionListeners.forEach { it.actionPerformed(null) }
-        UIUtil.dispatchAllInvocationEvents()
-
-        dialog.parentHeaderLabel.text shouldContain "Description for existing commit"
-        dialog.parentHeaderLabel.text shouldContain source.id.short
-        dialog.childHeaderLabel.text shouldContain "Description for new commit"
-        dialog.childHeaderLabel.text shouldContain "sibling of"
-        dialog.childHeaderLabel.text shouldNotContain "child of"
-
-        // Regression for jj-idea-luxb (GitHub #114): parallel mode used to call its two sides
-        // "First"/"Second", which the reporter found confusing wording for a split. That
-        // vocabulary was retired for good by jj-idea-8khi's identity-first rename - confirm it
-        // can't resurface in parallel mode specifically, including on the hunk picker's labels
-        // (firstCommitLabel/secondCommitLabel, fed to HunkPickerLabels.forSplit), which aren't
-        // covered by the header/summary assertions above.
-        dialog.parentHeaderLabel.text shouldNotContain "First"
-        dialog.parentHeaderLabel.text shouldNotContain "Second"
-        dialog.childHeaderLabel.text shouldNotContain "First"
-        dialog.childHeaderLabel.text shouldNotContain "Second"
-        dialog.summaryLabel.text shouldNotContain "First"
-        dialog.summaryLabel.text shouldNotContain "Second"
-        dialog.modeNoteText shouldNotContain "First"
-        dialog.modeNoteText shouldNotContain "Second"
-        dialog.firstCommitLabel shouldBe "Existing commit"
-        dialog.secondCommitLabel shouldBe "New commit"
-
-        disposeDialog(dialog)
-    }
-
-    // Regression coverage for jj-idea-o6sw (GitHub #101 follow-up): toggling parallel mode only
-    // recomputed the label fields — the already-rendered summary (and diff preview) kept stale
-    // wording until some other event (a tick change) happened to refresh them. With identity-first
-    // wording (jj-idea-8khi) the summary text itself no longer varies by mode, so this now checks
-    // that the mode note - which does vary - updates live instead.
-    @Test
-    fun `summary and mode note refresh live when parallel toggled`() {
-        val changes = listOf(change("src/Main.kt"))
-        val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
-        waitForRefresh(dialog.fileSelection)
-
-        dialog.summaryLabel.text shouldContain "New commit"
-        dialog.summaryLabel.text shouldContain "Existing commit"
-        dialog.modeNoteText shouldContain "child commit"
-        dialog.modeNoteText shouldNotContain "beside"
-
-        dialog.parallelCheckBox.isSelected = true
-        dialog.parallelCheckBox.actionListeners.forEach { it.actionPerformed(null) }
-        UIUtil.dispatchAllInvocationEvents()
-
-        dialog.summaryLabel.text shouldContain "New commit"
-        dialog.summaryLabel.text shouldContain "Existing commit"
-        dialog.modeNoteText shouldContain "beside"
-        dialog.modeNoteText shouldContain "merges"
-
-        disposeDialog(dialog)
-    }
-
-    // Regression coverage for the follow-up to jj-idea-8khi: the mode note used to be a plain
-    // JBLabel, which reports its preferred width as whatever a single unwrapped line needs - wide
-    // enough to force the whole left column of the dialog wider to fit it. It's now an HTML pane
-    // (IconAwareHtmlPane), which wraps instead.
-    @Test
-    fun `mode note wraps instead of forcing a wide preferred size`() {
-        val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList())
-
-        // Parallel mode has the longest note text ("...Any existing children become merges of
-        // both."). A plain JLabel would report a single-line preferred width well over 500px for
-        // this sentence at typical dialog font sizes.
-        dialog.parallelCheckBox.isSelected = true
-        dialog.parallelCheckBox.actionListeners.forEach { it.actionPerformed(null) }
-        UIUtil.dispatchAllInvocationEvents()
-
-        dialog.modeNoteComponent.preferredSize.width shouldBeLessThan JBUI.scale(500)
+        // A plain JLabel would report a single-line preferred width well over 500px for this
+        // sentence at typical dialog font sizes.
+        dialog.noteComponent.preferredSize.width shouldBeLessThan JBUI.scale(500)
 
         disposeDialog(dialog)
     }
@@ -169,7 +65,7 @@ class SplitDialogTest {
     fun `no files ticked by default in file selection`() {
         val changes = listOf(change("src/Main.kt"), change("src/Utils.kt"))
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
         dialog.fileSelection.includedChanges.size shouldBe 0
@@ -177,30 +73,30 @@ class SplitDialogTest {
     }
 
     @Test
-    fun `validation fails when nothing ticked (nothing to split off)`() {
+    fun `validation fails when nothing ticked (nothing to commit)`() {
         val changes = listOf(change("src/Main.kt"), change("src/Utils.kt"))
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
-        // Nothing ticked and no overrides — validation should fail (child would be empty)
+        // Nothing ticked and no overrides — validation should fail (commit would be empty)
         dialog.doValidateForTest() shouldNotBe null
         disposeDialog(dialog)
     }
 
     @Test
-    fun `validation fails when all files ticked (nothing left for parent)`() {
+    fun `validation passes when all files ticked (commits everything)`() {
         val main = change("src/Main.kt")
         val utils = change("src/Utils.kt")
         val changes = listOf(main, utils)
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
         dialog.fileSelection.changesTree.setIncludedChanges(changes)
         UIUtil.dispatchAllInvocationEvents()
 
-        dialog.doValidateForTest() shouldNotBe null
+        dialog.doValidateForTest() shouldBe null
         disposeDialog(dialog)
     }
 
@@ -210,7 +106,7 @@ class SplitDialogTest {
         val utils = change("src/Utils.kt")
         val changes = listOf(main, utils)
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
         dialog.fileSelection.changesTree.setIncludedChanges(listOf(main))
@@ -226,12 +122,12 @@ class SplitDialogTest {
         val loggerChange = change("src/Logger.kt")
         val changes = listOf(authChange, loggerChange)
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
         // Nothing ticked, but Auth.kt has a genuine partial hunk pick - applyPickedContent
         // deliberately leaves the tick alone for a partial, so this is exactly the state a
-        // hunks-only split produces.
+        // hunks-only commit produces.
         val authPath = LocalFilePath("src/Auth.kt", false)
         dialog.setFirstCommitOverrideForTest(authPath, "partial content\n")
 
@@ -240,105 +136,44 @@ class SplitDialogTest {
         disposeDialog(dialog)
     }
 
-    @Test
-    fun `hunks-only split passes every file as the fileset and carries the picked remainder`() {
-        val authChange = change("src/Auth.kt")
-        val loggerChange = change("src/Logger.kt")
-        val changes = listOf(authChange, loggerChange)
-        val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
-        waitForRefresh(dialog.fileSelection)
-
-        val authPath = LocalFilePath("src/Auth.kt", false)
-        dialog.setFirstCommitOverrideForTest(authPath, "partial content\n")
-
-        dialog.performOKForTest()
-        val result = dialog.result
-
-        result shouldNotBe null
-        result!!.hunkSelection shouldNotBe null
-        // Nothing ticked means nothing is removed from the parent's fileset.
-        result.filePaths.toSet() shouldBe setOf(authChange.filePath, loggerChange.filePath)
-        val authContent = result.hunkSelection!!.files.first { it.filePath == authPath }.content
-        authContent shouldBe "partial content\n"
-        disposeDialog(dialog)
-    }
-
-    @Test
-    fun `unticked deletion lands in the first commit via the deletion manifest (jj-idea-5g8h)`() {
-        val gone = deletion("src/Gone.kt")
-        val auth = change("src/Auth.kt")
-        val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, listOf(gone, auth))
-        waitForRefresh(dialog.fileSelection)
-
-        // Auth.kt is partially picked (forces the hunk route); nothing is ticked, so Gone.kt's
-        // deletion stays with the first commit.
-        dialog.setFirstCommitOverrideForTest(LocalFilePath("src/Auth.kt", false), "partial\n")
-        dialog.performOKForTest()
-
-        val hunks = dialog.result!!.hunkSelection!!
-        hunks.deletedPaths shouldBe setOf("src/Gone.kt")
-        hunks.files.first { it.filePath == gone.filePath }.content shouldBe null
-        disposeDialog(dialog)
-    }
-
-    @Test
-    fun `ticked deletion stays out of the first commit's deletion manifest (jj-idea-5g8h)`() {
-        val gone = deletion("src/Gone.kt")
-        val auth = change("src/Auth.kt")
-        val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, listOf(gone, auth))
-        waitForRefresh(dialog.fileSelection)
-
-        dialog.fileSelection.changesTree.setIncludedChanges(listOf(gone))
-        UIUtil.dispatchAllInvocationEvents()
-        dialog.setFirstCommitOverrideForTest(LocalFilePath("src/Auth.kt", false), "partial\n")
-        dialog.performOKForTest()
-
-        dialog.result!!.hunkSelection!!.deletedPaths shouldBe emptySet()
-        disposeDialog(dialog)
-    }
-
     private val authPath = LocalFilePath("src/Auth.kt", false)
 
     @Test
-    fun `newParent hunks-only split validates and carries the picked new-commit content`() {
+    fun `hunks-only commit validates and carries the picked committed content`() {
         val authChange = change("src/Auth.kt")
         val loggerChange = change("src/Logger.kt")
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, listOf(authChange, loggerChange), newParent = true)
+        val dialog = CommitDialog(project.get(), source, listOf(authChange, loggerChange))
         waitForRefresh(dialog.fileSelection)
 
-        // Nothing ticked, but Auth.kt has a genuine partial pick: that's real content for the new parent.
+        // Nothing ticked, but Auth.kt has a genuine partial pick: that's real content to commit.
         dialog.setFirstCommitOverrideForTest(authPath, "partial content\n")
 
         dialog.doValidateForTest() shouldBe null
         dialog.performOKForTest()
         val result = dialog.result!!
-        result.insertBefore shouldBe source.id
         result.filePaths shouldBe emptyList()
         result.hunkSelection!!.files.first { it.filePath == authPath }.content shouldBe "partial content\n"
         disposeDialog(dialog)
     }
 
     @Test
-    fun `newParent ticked deletion goes into the deletion manifest, unticked one does not`() {
+    fun `ticked deletion goes into the deletion manifest, unticked one does not`() {
         val gone = deletion("src/Gone.kt")
         val auth = change("src/Auth.kt")
         val source = createEntry("src1", description = "desc")
 
-        val ticked = SplitDialog(project.get(), source, listOf(gone, auth), newParent = true)
+        val ticked = CommitDialog(project.get(), source, listOf(gone, auth))
         waitForRefresh(ticked.fileSelection)
         ticked.fileSelection.changesTree.setIncludedChanges(listOf(gone))
         UIUtil.dispatchAllInvocationEvents()
         ticked.setFirstCommitOverrideForTest(authPath, "partial\n")
         ticked.performOKForTest()
-        // The new parent is the lower commit, so a ticked deletion lands there.
+        // The committed change is the lower commit, so a ticked deletion lands there.
         ticked.result!!.hunkSelection!!.deletedPaths shouldBe setOf("src/Gone.kt")
         disposeDialog(ticked)
 
-        val unticked = SplitDialog(project.get(), source, listOf(gone, auth), newParent = true)
+        val unticked = CommitDialog(project.get(), source, listOf(gone, auth))
         waitForRefresh(unticked.fileSelection)
         unticked.setFirstCommitOverrideForTest(authPath, "partial\n")
         unticked.performOKForTest()
@@ -347,9 +182,9 @@ class SplitDialogTest {
     }
 
     @Test
-    fun `newParent computePreviewLeftContent is mirrored - ticked shows after, unticked shows base`() {
+    fun `computePreviewLeftContent - ticked shows after, unticked shows base`() {
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
+        val dialog = CommitDialog(project.get(), source, emptyList())
 
         dialog.computePreviewLeftContent(true, null, "base", "after") shouldBe "after"
         dialog.computePreviewLeftContent(false, null, "base", "after") shouldBe "base"
@@ -358,10 +193,10 @@ class SplitDialogTest {
     }
 
     @Test
-    fun `newParent applyPickedContent ticks on all-changes, unticks on no-changes, and keeps tick on a partial`() {
+    fun `applyPickedContent ticks on all-changes, unticks on no-changes, and keeps tick on a partial`() {
         val authChange = change("src/Auth.kt")
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, listOf(authChange), newParent = true)
+        val dialog = CommitDialog(project.get(), source, listOf(authChange))
         waitForRefresh(dialog.fileSelection)
 
         dialog.applyPickedContent(authPath, "after", "base", "after")
@@ -379,7 +214,7 @@ class SplitDialogTest {
     fun `override injected for test produces non-null hunkSelection`() {
         val changes = listOf(change("src/Auth.kt"), change("src/Logger.kt"))
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
         val fp = LocalFilePath("src/Auth.kt", false)
@@ -401,10 +236,10 @@ class SplitDialogTest {
         val loggerChange = change("src/Logger.kt")
         val changes = listOf(authChange, loggerChange)
         val source = createEntry("src1", description = "initial desc")
-        val dialog = SplitDialog(project.get(), source, changes)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
-        // Tick Logger so it moves to the child (file-level, no overrides).
+        // Tick Logger so it is committed (file-level, no overrides).
         dialog.fileSelection.changesTree.setIncludedChanges(listOf(loggerChange))
         UIUtil.dispatchAllInvocationEvents()
 
@@ -413,65 +248,36 @@ class SplitDialogTest {
 
         result shouldNotBe null
         result!!.hunkSelection shouldBe null // no overrides → fast path
-        result.filePaths shouldBe listOf(authChange.filePath) // Auth.kt stays in the parent
-        result.selectedDescription shouldBe Description("initial desc")
-        result.remainingDescription shouldBe null // unchanged
-        result.parallel shouldBe false
+        result.filePaths shouldBe listOf(loggerChange.filePath) // Logger.kt is committed
+        result.description shouldBe Description("initial desc")
         disposeDialog(dialog)
     }
 
     @Test
-    fun `preSelectedFiles from right-click land in the child, not the parent`() {
+    fun `preSelectedFiles from right-click start ticked`() {
         val authChange = change("src/Auth.kt")
         val loggerChange = change("src/Logger.kt")
         val changes = listOf(authChange, loggerChange)
         val source = createEntry("src1", description = "desc")
         val authPath = LocalFilePath("src/Auth.kt", false)
 
-        // Simulate right-clicking Auth.kt and choosing "Split into New Child".
-        val dialog = SplitDialog(project.get(), source, changes, preSelectedFiles = setOf(authPath))
+        val dialog = CommitDialog(project.get(), source, changes, preSelectedFiles = setOf(authPath))
         waitForRefresh(dialog.fileSelection)
 
-        // The right-clicked file must start TICKED (moving to the child); the other file
-        // stays unticked (remains in the parent).
-        dialog.fileSelection.includedChanges.toSet() shouldBe setOf(authChange)
-
-        dialog.performOKForTest()
-        val result = dialog.result
-        result shouldNotBe null
-        // filePaths are the files that stay in the parent (`jj split` keeps them there).
-        result!!.filePaths shouldBe listOf(loggerChange.filePath)
-        disposeDialog(dialog)
-    }
-
-    // ---- newParent mode (jj-idea-tkog, GitHub #74) ----
-
-    @Test
-    fun `newParent mode ticks preSelectedFiles directly, no complement inversion`() {
-        val authChange = change("src/Auth.kt")
-        val loggerChange = change("src/Logger.kt")
-        val changes = listOf(authChange, loggerChange)
-        val source = createEntry("src1", description = "desc")
-        val authPath = LocalFilePath("src/Auth.kt", false)
-
-        val dialog = SplitDialog(project.get(), source, changes, preSelectedFiles = setOf(authPath), newParent = true)
-        waitForRefresh(dialog.fileSelection)
-
-        // Unlike the old tick-inversion hack, the right-clicked file starts ticked directly.
         dialog.fileSelection.includedChanges.toSet() shouldBe setOf(authChange)
         disposeDialog(dialog)
     }
 
     @Test
-    fun `newParent mode passes ticked files as the fileset, sets insertBefore to the source`() {
+    fun `ticked files are passed as the fileset`() {
         val authChange = change("src/Auth.kt")
         val loggerChange = change("src/Logger.kt")
         val changes = listOf(authChange, loggerChange)
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes, newParent = true)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
-        // Tick Auth.kt: it should become the new commit's fileset.
+        // Tick Auth.kt: it should become the commit's fileset.
         dialog.fileSelection.changesTree.setIncludedChanges(listOf(authChange))
         UIUtil.dispatchAllInvocationEvents()
 
@@ -479,94 +285,63 @@ class SplitDialogTest {
         val result = dialog.result
         result shouldNotBe null
         result!!.filePaths shouldBe listOf(authChange.filePath)
-        result.insertBefore shouldBe source.id
-        result.parallel shouldBe false
         disposeDialog(dialog)
     }
 
     @Test
-    fun `newParent mode routes descriptions by role, not by pane`() {
+    fun `description is passed as the commit message`() {
         val authChange = change("src/Auth.kt")
         val changes = listOf(authChange)
         val source = createEntry("src1", description = "original desc")
-        val dialog = SplitDialog(project.get(), source, changes, newParent = true)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
         dialog.fileSelection.changesTree.setIncludedChanges(listOf(authChange))
         UIUtil.dispatchAllInvocationEvents()
 
-        // childDescriptionField is the ticked pane's field, which in newParent mode is the
-        // *selected* (new-commit) side and gets -m; parentDescriptionField is the unticked
-        // pane's field, the *remaining* (stays-here) side.
-        dialog.childDescriptionText shouldBe "original desc"
+        dialog.descriptionText shouldBe "original desc"
         dialog.performOKForTest()
         val result = dialog.result
         result shouldNotBe null
-        result!!.selectedDescription shouldBe Description("original desc")
-        result.remainingDescription shouldBe null // unedited, stays unchanged
+        result!!.description shouldBe Description("original desc")
         disposeDialog(dialog)
     }
 
     @Test
-    fun `newParent mode hides the parallel checkbox (mutually exclusive with -B)`() {
+    fun `shows Pick Hunks`() {
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
-
-        dialog.parallelCheckBox.isVisible shouldBe false
-        disposeDialog(dialog)
-    }
-
-    @Test
-    fun `newParent mode shows Pick Hunks`() {
-        val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
+        val dialog = CommitDialog(project.get(), source, emptyList())
 
         dialog.pickHunksButton.isVisible shouldBe true
         disposeDialog(dialog)
     }
 
     @Test
-    fun `newParent mode headers spell out which side becomes parent of which`() {
+    fun `header names the committed change`() {
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
+        val dialog = CommitDialog(project.get(), source, emptyList())
 
-        // childHeaderLabel is the ticked pane ("New commit"); parentHeaderLabel is the unticked
-        // pane ("Description for existing commit …") - see updateDynamicLabels, and class KDoc
-        // for why the wording is identity-first and shared with the other two modes (jj-idea-8khi).
-        dialog.childHeaderLabel.text shouldContain "Description for new commit"
-        dialog.childHeaderLabel.text shouldContain "parent of"
-        dialog.childHeaderLabel.text shouldContain source.id.short
-        dialog.parentHeaderLabel.text shouldContain "Description for existing commit"
-        dialog.parentHeaderLabel.text shouldContain source.id.short
+        dialog.headerLabel.text shouldContain "Description for committed change"
+        dialog.headerLabel.text shouldContain source.id.short
+        dialog.firstCommitLabel shouldBe "New working copy"
+        dialog.secondCommitLabel shouldBe "Committed change"
         disposeDialog(dialog)
     }
 
     @Test
-    fun `newParent mode note describes insertion below, not the parallel or child wording`() {
+    fun `note says unticked files move to a new working-copy change`() {
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
+        val dialog = CommitDialog(project.get(), source, emptyList())
 
-        dialog.modeNoteText shouldContain "inserted below"
-        dialog.modeNoteText shouldContain source.id.short
-        dialog.modeNoteText shouldNotContain "sibling"
-        dialog.modeNoteText shouldNotContain "child commit"
-        disposeDialog(dialog)
-    }
-
-    @Test
-    fun `default mode still hides nothing (regression check)`() {
-        val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList())
-
-        dialog.parallelCheckBox.isVisible shouldBe true
-        dialog.pickHunksButton.isVisible shouldBe true
+        dialog.noteText shouldContain "new working-copy change"
+        dialog.noteText shouldContain source.id.short
         disposeDialog(dialog)
     }
 
     @Test
     fun `pickHunksButton is wired into the shared preview panel's footer`() {
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList())
+        val dialog = CommitDialog(project.get(), source, emptyList())
 
         // Regression check for the FileDiffPreviewPanel extraction (jj-idea-8a8z): the button
         // must actually be added to the shared shell's footer, not orphaned by the refactor.
@@ -575,39 +350,9 @@ class SplitDialogTest {
     }
 
     @Test
-    fun `computePreviewLeftContent unticked returns after content (nothing moves)`() {
-        val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList())
-
-        val content = dialog.computePreviewLeftContent(
-            isTicked = false,
-            override = null,
-            baseContent = "before\n",
-            afterContent = "after\n"
-        )
-        content shouldBe "after\n"
-        disposeDialog(dialog)
-    }
-
-    @Test
-    fun `computePreviewLeftContent fully ticked returns base content`() {
-        val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList())
-
-        val content = dialog.computePreviewLeftContent(
-            isTicked = true,
-            override = null,
-            baseContent = "before\n",
-            afterContent = "after\n"
-        )
-        content shouldBe "before\n"
-        disposeDialog(dialog)
-    }
-
-    @Test
     fun `computePreviewLeftContent partial override wins regardless of tick`() {
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList())
+        val dialog = CommitDialog(project.get(), source, emptyList())
 
         val content = dialog.computePreviewLeftContent(
             isTicked = true,
@@ -624,7 +369,7 @@ class SplitDialogTest {
         val authChange = change("src/Auth.kt")
         val changes = listOf(authChange)
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
         val fp = LocalFilePath("src/Auth.kt", false)
@@ -632,24 +377,9 @@ class SplitDialogTest {
         // result directly, exactly as onPickHunks would after a real partial pick.
         dialog.applyPickedContent(fp, "partial\n", baseContent = "before\n", afterContent = "after\n")
 
-        // Regression: this used to force-tick the file (ensureFileIncluded), making a
-        // half-picked file look fully committed to the child.
+        // A partial must not force-tick the file (ensureFileIncluded), which would make a
+        // half-picked file look fully committed.
         dialog.fileSelection.includedChanges shouldBe emptyList()
-        disposeDialog(dialog)
-    }
-
-    @Test
-    fun `applyPickedContent for a fully-picked result ticks the file`() {
-        val authChange = change("src/Auth.kt")
-        val changes = listOf(authChange)
-        val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
-        waitForRefresh(dialog.fileSelection)
-
-        val fp = LocalFilePath("src/Auth.kt", false)
-        dialog.applyPickedContent(fp, "before\n", baseContent = "before\n", afterContent = "after\n")
-
-        dialog.fileSelection.includedChanges.toSet() shouldBe setOf(authChange)
         disposeDialog(dialog)
     }
 
@@ -658,7 +388,7 @@ class SplitDialogTest {
         val authChange = change("src/Auth.kt")
         val changes = listOf(authChange, change("src/Logger.kt"))
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
         val fp = LocalFilePath("src/Auth.kt", false)
@@ -674,7 +404,7 @@ class SplitDialogTest {
         val authChange = change("src/Auth.kt")
         val changes = listOf(authChange)
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
         val fp = LocalFilePath("src/Auth.kt", false)
@@ -689,7 +419,7 @@ class SplitDialogTest {
     fun `cancel returns null hunkPickerForTest to leave state unchanged`() {
         val changes = listOf(change("src/Auth.kt"))
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes)
+        val dialog = CommitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
         val fp = LocalFilePath("src/Auth.kt", false)

@@ -113,6 +113,8 @@ object JujutsuLogContextMenuActions {
         add(squashIntoAction(uniqueRepo?.takeIf { squashIntoSrcs.isNotEmpty() }, squashIntoSrcs))
         add(squashFromAction(entry?.takeIf { !it.immutable }))
         add(squashIntoImmutableParentAction(project, entry))
+        // `jj commit` only acts on the working copy (no -r)
+        add(commitAction(project, entry?.takeIf { it.isWorkingCopy }))
         add(splitAction(project, entry?.takeIf { !it.immutable }))
         add(splitAction(project, entry?.takeIf { !it.immutable }, newParent = true))
 

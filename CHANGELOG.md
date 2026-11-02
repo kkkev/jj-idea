@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Commit…**: commit part of the working copy and carry on with the rest, like `jj commit`. Commit… in the Working Copy toolbar, on the `@` row of the log, or on selected files opens a dialog like Split into New Parent's, but with a single description: the ticked files and hunks keep the working copy's change ID and get the description, and everything else moves to a new working-copy change on top. Unlike Split into New Parent, the new working copy gets its own author date, so a series of commits made during the day no longer all share the time the working copy was first edited. ([#157](https://github.com/kkkev/jj-idea/issues/157))
+
 ## [0.9.4] - 2026-11-02
 
 ### Added

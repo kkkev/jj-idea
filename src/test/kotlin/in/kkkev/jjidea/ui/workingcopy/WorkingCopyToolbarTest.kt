@@ -27,7 +27,7 @@ import javax.swing.JPanel
 
 /**
  * Guards jj-idea-xsa8 (GitHub #61): the Working Copy toolbar offers "actions anchored at `@`" —
- * New Change, Split, Squash, Abandon, Create Bookmark, Advance Bookmark, Set Tag — with stable
+ * New Change, Commit, Split, Squash, Abandon, Create Bookmark, Advance Bookmark, Set Tag — with stable
  * action instances across refreshes (`ActionToolbarImpl` reuses buttons by identity) and correct
  * enablement even before/after a repository is bound.
  *
@@ -47,12 +47,13 @@ class WorkingCopyToolbarTest {
     }
 
     @Test
-    fun `toolbar offers New Change, Split, Squash, Abandon, Create Bookmark, Advance Bookmark, Set Tag, in order`() {
+    fun `toolbar offers New Change, Commit, Split, Squash, Abandon, bookmark and tag actions, in order`() {
         val panel = WorkingCopyControlsPanel(project.get()).also { Disposer.register(project.get(), it) }
         val actions = panel.createActionToolbar(JPanel()).actionGroup.getChildren(null)
 
         actions.map { if (it is Separator) null else updated(it).text } shouldBe listOf(
             JujutsuBundle.message("button.newchange"),
+            JujutsuBundle.message("log.action.commit"),
             JujutsuBundle.message("log.action.split"),
             JujutsuBundle.message("log.action.squash.into.parent"),
             JujutsuBundle.message("log.action.abandon"),
@@ -116,6 +117,15 @@ class WorkingCopyToolbarTest {
             .single { updated(it).text == JujutsuBundle.message("log.action.split") }
 
         updated(splitAction).isEnabled shouldBe false
+    }
+
+    @Test
+    fun `Commit starts disabled with no bound repository`() {
+        val panel = WorkingCopyControlsPanel(project.get()).also { Disposer.register(project.get(), it) }
+        val commitAction = panel.createActionToolbar(JPanel()).actionGroup.getChildren(null)
+            .single { updated(it).text == JujutsuBundle.message("log.action.commit") }
+
+        updated(commitAction).isEnabled shouldBe false
     }
 
     @Test

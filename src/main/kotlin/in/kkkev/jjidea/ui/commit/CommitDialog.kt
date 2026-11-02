@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui.split
+package `in`.kkkev.jjidea.ui.commit
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
@@ -7,7 +7,6 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.ui.OnePixelSplitter
-import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -17,7 +16,6 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.ui.common.FileContents
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.ui.common.HunkPickPreviewController
@@ -36,75 +34,49 @@ import java.awt.Font
 import javax.swing.*
 
 /**
- * Result of the split dialog.
+ * Result of the commit dialog.
  *
- * The fileset that ends up in [filePaths] is always the ticked pane's files when [newParent] mode
- * built this spec, and the *unticked* pane's files otherwise (`jj split`'s "selected" fileset
- * argument) - see [SplitDialog] for why the tick-to-fileset mapping depends on mode.
+ * [filePaths] is the ticked pane's files (`jj commit`'s "selected" fileset argument): they stay on
+ * the working copy's change ID, and everything else moves to a new working-copy change on top.
  *
- * [selectedDescription] is passed as `-m` and always describes whichever side [filePaths] ends up
- * in (`jj split`'s "selected" side). [remainingDescription] is applied via a follow-up
- * `jj describe` on whichever side is *not* [filePaths] (`jj split`'s "remaining" side; null = keep
- * its original description). [insertBefore] is non-null only in [newParent] mode: it becomes
- * `jj split`'s `-B` argument, extracting [filePaths] into a **new** commit inserted before
- * [insertBefore], while the remaining changes keep [revision]'s original change ID and location.
- * When null (the default, "Split into New Child" mode), [filePaths] stays on [revision]'s
- * original change ID and everything else becomes a new child commit instead.
+ * [description] is passed as `-m` and describes the side [filePaths] ends up in.
  *
  * [hunkSelection], when non-null, is the content the diff editor writes into the **lower** commit
- * (the "stays" side by default, the new parent under `-B`); files it doesn't cover fall back to
- * the [filePaths] fileset.
+ * (the committed change); files it doesn't cover fall back to the [filePaths] fileset.
  */
-data class SplitSpec(
-    val revision: Revision,
-    /** Whole-file fast path: see this class's KDoc for which side's files end up here. */
+data class CommitSpec(
+    /** Whole-file fast path: see this class's KDoc. */
     val filePaths: List<FilePath>,
     /** Hunk-level selection. Non-null when at least one file is partially selected. */
     val hunkSelection: HunkSelection?,
-    val selectedDescription: Description,
-    val remainingDescription: Description?,
-    val parallel: Boolean,
-    val insertBefore: Revision? = null
+    val description: Description
 )
 
 /**
- * Dialog for configuring a `jj split` operation.
+ * Dialog for configuring a `jj commit` operation (GitHub #157). Derived from the "Split into New
+ * Parent" mode of [in.kkkev.jjidea.ui.split.SplitDialog], which has the same tick polarity.
  *
  * Layout: left panel = changed-files list with file-level checkboxes + summary; right panel =
- * native read-only diff preview for the selected file + "Pick Hunks…" button. Description
- * fields and options are at the bottom.
+ * native read-only diff preview for the selected file + "Pick Hunks…" button. The description
+ * field is at the bottom.
  *
- * **The tick has one meaning in every mode** (jj-idea-8khi, GitHub #101 UX follow-up): leaving a
- * file unticked keeps it **on [sourceEntry]'s own change ID and position** ("Stays on …");
- * ticking it moves it to a **brand-new commit** ("New commit …"). Only the new commit's
- * *position* changes with mode - a child (default), a sibling (`--parallel`, jj rebases any
- * existing children onto both siblings, turning them into merges), or a parent (`-B`/[newParent],
- * jj-idea-tkog, GitHub #74). Nothing is ticked by default. "Pick Hunks…" opens IDEA's merge
- * window to move a subset of a file's hunks to the new commit, leaving the remainder where it
- * stays - in every mode, including [newParent] (jj-idea-p6bo, GitHub #139/#132).
+ * Ticking a file **commits** it: it stays on [sourceEntry]'s own change ID, which gets the
+ * description. Unticked files move to a **new working-copy change** on top. Nothing is ticked by
+ * default. "Pick Hunks…" opens IDEA's merge window to commit a subset of a file's hunks.
  *
  * Hunk content is modelled by the **lower** (older) of the two resulting commits, because that is
- * what `jj split --tool` reads back from `$right`: the "stays" commit by default and with
- * `--parallel`, but the *new* commit under `-B` (verified against jj 0.44 in
- * `SplitHunkContractCliTest`). A file's lower content is its pre-change (`base`) content exactly
- * when `ticked xor newParent`, and its full (`after`) content otherwise - see
- * [computePreviewLeftContent]. [firstCommitOverrides] holds a picked lower-commit content.
- *
- * This identity-first wording is deliberately mode-invariant in the UI even though jj's own
- * fileset-argument polarity is not: the fileset passed on the command line is whichever side
- * *keeps* [sourceEntry]'s identity in the default and `--parallel` modes, but the side that
- * becomes the *new* commit under `-B` (verified against jj 0.44 - see [MutatingCommandsContractTest]
- * for the `--parallel` and `-B` contract tests this rests on). [updateDynamicLabels] and
- * [doOKAction] are what translate the constant tick meaning into that varying fileset role.
+ * what `jj commit --tool` reads back from `$right`: the committed change (verified in
+ * `CommitContractCliTest`). A file's lower content is its pre-change (`base`) content exactly
+ * when unticked, and its full (`after`) content otherwise - see [computePreviewLeftContent].
+ * [firstCommitOverrides] holds a picked lower-commit content.
  */
-class SplitDialog(
+class CommitDialog(
     private val project: Project,
     private val sourceEntry: LogEntry,
     changes: List<Change>,
-    preSelectedFiles: Set<FilePath>? = null,
-    private val newParent: Boolean = false
+    preSelectedFiles: Set<FilePath>? = null
 ) : DialogWrapper(project) {
-    var result: SplitSpec? = null
+    var result: CommitSpec? = null
         private set
 
     private val allChanges = changes.toList()
@@ -127,9 +99,8 @@ class SplitDialog(
         },
         isIncluded = { fp -> fileSelection.includedChanges.any { it.filePath == fp } },
         movesToLabel = { secondCommitLabel },
-        // Lower commit is the "stays" side by default (hunks move when NOT applied in it); under
-        // -B it is the new commit itself (hunks move when applied).
-        invertApplied = !newParent,
+        // Lower commit is the committed change itself (hunks are committed when applied).
+        invertApplied = false,
         onHunksChanged = { fp, content, contents ->
             applyPickedContent(fp, content, contents.before, contents.after)
             updateSummary()
@@ -142,68 +113,35 @@ class SplitDialog(
         addActionListener { onPickHunks() }
     }
 
-    // --- Descriptions ---
-    internal val parentDescriptionEditor = DescriptionEditor(project).apply {
-        text = sourceEntry.description
-        Disposer.register(disposable, this)
-    }
-    internal val childDescriptionEditor = DescriptionEditor(project).apply {
+    // --- Description ---
+    internal val descriptionEditor = DescriptionEditor(project).apply {
         text = sourceEntry.description
         Disposer.register(disposable, this)
     }
 
-    // --- Dynamic labels ---
-    // One label per description editor, not two (jj-idea-8khi follow-up): combines what was
-    // previously a bold identity header ("New commit (sibling of X)") plus a separate plain
-    // sub-label ("New commit description") into a single "Description for …" line - the two were
-    // redundant, and splitting one piece of information across two lines added noise rather than
-    // clarity. HTML panes, not JLabels, so the embedded change id renders with the same
+    // --- Labels ---
+    // An HTML pane, not a JLabel, so the embedded change id renders with the same
     // bold-prefix/grey-remainder styling used everywhere else in the plugin (setStyledText/
     // TextCanvas.append(ChangeId)) instead of as plain text.
-    internal val parentHeaderLabel = IconAwareHtmlPane(project).apply { alignmentX = JLabel.LEFT_ALIGNMENT }
-    internal val childHeaderLabel = IconAwareHtmlPane(project).apply { alignmentX = JLabel.LEFT_ALIGNMENT }
+    internal val headerLabel = IconAwareHtmlPane(project).apply { alignmentX = JLabel.LEFT_ALIGNMENT }
 
-    // Short labels for the two commits; match the merge picker and summary wording. Overwritten
-    // immediately by updateDynamicLabels() in init{} - these are just well-formed placeholders.
-    internal var firstCommitLabel: String = legendLabel("dialog.split.legend.stays")
-    internal var secondCommitLabel: String = legendLabel("dialog.split.legend.new")
+    // Short labels for the two commits; match the merge picker and summary wording. The first
+    // commit is the unticked side, the second the ticked (committed) one.
+    internal val firstCommitLabel: String = legendLabel("dialog.commit.legend.remaining")
+    internal val secondCommitLabel: String = legendLabel("dialog.commit.legend.committed")
 
     // --- Summary ---
     internal val summaryLabel = JBLabel().apply {
         foreground = JBUI.CurrentTheme.Label.disabledForeground()
     }
 
-    // --- Options ---
-    // `jj split` rejects -B combined with --parallel, so this is unavailable in newParent mode.
-    internal val parallelCheckBox = JBCheckBox(JujutsuBundle.message("dialog.split.parallel")).apply {
-        isVisible = !newParent
-    }
-
-    // --- Working-copy movement note (jj-idea-tkog) ---
-    // Only shown when splitting the working copy itself, where which side @ ends up on isn't
-    // obvious: it stays on the original change ID in newParent mode, but moves to the new commit
-    // otherwise - true of --parallel as well as the plain default, verified against real jj in
-    // MutatingCommandsContractCliTest's "split --parallel on the working copy…" test (jj-idea-8khi).
-    //
-    // An HTML pane, not a JLabel (jj-idea-8khi): word-wraps within the column instead of forcing
-    // it wider to fit the longest line, and lets the embedded change id use the same styling as
-    // everywhere else (see setStyledText). Text is set once at construction - unlike modeNoteLabel
-    // below, this note's mode (newParent or not) is fixed for the dialog's lifetime.
-    private val workingCopyNoteLabel = IconAwareHtmlPane(project).apply {
+    // --- Note ---
+    // States where the ticked and unticked changes end up. An HTML pane, not a JLabel: word-wraps
+    // within the column instead of forcing it wider to fit the longest line, and lets the embedded
+    // change id use the same styling as everywhere else (see setStyledText).
+    private val noteLabel = IconAwareHtmlPane(project).apply {
         foreground = JBUI.CurrentTheme.Label.disabledForeground()
-        isVisible = sourceEntry.isWorkingCopy
-        if (sourceEntry.isWorkingCopy) {
-            setStyledText(if (newParent) "dialog.split.wc.stays" else "dialog.split.wc.moves", sourceEntry.id)
-        }
-    }
-
-    // --- Mode note (jj-idea-8khi, GitHub #101 UX follow-up) ---
-    // States the one fact the identity-first labels can't carry: where the new commit lands, and
-    // (parallel only) that existing children become merges of both siblings. Always visible -
-    // there's always a mode to explain - text is set live by updateDynamicLabels(). An HTML pane
-    // for the same word-wrap/styling reasons as workingCopyNoteLabel above.
-    private val modeNoteLabel = IconAwareHtmlPane(project).apply {
-        foreground = JBUI.CurrentTheme.Label.disabledForeground()
+        setStyledText("dialog.commit.note", sourceEntry.id)
     }
 
     // --- Test seam: injectable merge picker (avoids modal merge under tests) ---
@@ -211,21 +149,16 @@ class SplitDialog(
     internal var hunkPickerForTest: ((FilePath) -> String?)? = null
 
     init {
-        title = JujutsuBundle.message(if (newParent) "dialog.split.title.newParent" else "dialog.split.title")
-        setOKButtonText(JujutsuBundle.message("dialog.split.button"))
+        title = JujutsuBundle.message("dialog.commit.title")
+        setOKButtonText(JujutsuBundle.message("dialog.commit.button"))
 
-        parallelCheckBox.addActionListener {
-            updateDynamicLabels()
-            updateSummary()
-            previewController.currentFile?.let { previewController.refresh(it) }
-        }
-        updateDynamicLabels()
+        headerLabel.setStyledText("dialog.commit.header", sourceEntry.id, bold = true)
 
         // Populate file selection panel.
-        // Checked/included files are the ones MOVING TO THE CHILD (the new, split-off commit);
-        // everything left unticked stays in the parent. Nothing is ticked by default — the user
-        // opts in to what gets split off. preSelectedFiles (e.g. right-clicked files via
-        // "Split into New Child") start ticked, since that's what the user asked to split off.
+        // Checked/included files are the ones being COMMITTED; everything left unticked moves to
+        // the new working copy. Nothing is ticked by default — the user opts in to what gets
+        // committed. preSelectedFiles (e.g. right-clicked files via "Commit...") start ticked,
+        // since that's what the user asked to commit.
         val initialIncludedPaths = preSelectedFiles ?: emptySet()
         fileSelection.setChanges(allChanges, allChanges.filter { it.filePath in initialIncludedPaths })
         previousIncluded = initialIncludedPaths
@@ -248,11 +181,11 @@ class SplitDialog(
     private fun onFileInclusionChanged() {
         val nowIncluded = fileSelection.includedChanges.map { it.filePath }.toSet()
 
-        // Files newly unticked → clear any partial override (file is fully in the parent).
+        // Files newly unticked → clear any partial override (file moves fully to the new working copy).
         for (fp in (previousIncluded - nowIncluded)) {
             firstCommitOverrides.remove(fp)
         }
-        // Files newly ticked → clear any partial override (file moves fully to the child).
+        // Files newly ticked → clear any partial override (file is fully committed).
         for (fp in (nowIncluded - previousIncluded)) {
             firstCommitOverrides.remove(fp)
         }
@@ -270,12 +203,12 @@ class SplitDialog(
     // ---- File diff loading + preview ----
 
     /**
-     * Load the split-off change's before/after content and file type for [change], off the EDT —
+     * Load the working copy's before/after content and file type for [change], off the EDT —
      * the [HunkPickPreviewController] loader.
      *
      * The preview shows the file's own change, before → after, with a gutter checkbox per hunk
-     * ticking the hunks that move to the new commit; the ticks are derived from the content that
-     * **remains on the lower commit** — see [computePreviewLeftContent].
+     * ticking the hunks that are committed; the ticks are derived from the content that
+     * **lands in the lower commit** — see [computePreviewLeftContent].
      */
     private fun loadFileContents(change: Change): FileContents? {
         val fp = change.filePath
@@ -301,9 +234,8 @@ class SplitDialog(
 
     /**
      * Compute the left-side (lower-commit) content for the diff preview: an explicit override
-     * wins, otherwise it's derived from the tick. By default the lower commit is the "stays"
-     * side, so a ticked file leaves it with the pre-change content and an unticked one keeps
-     * everything; under [newParent] the lower commit is the *new* commit, so that flips.
+     * wins, otherwise it's derived from the tick. The lower commit is the committed change, so a
+     * ticked file gives it everything and an unticked one leaves it with the pre-change content.
      * Extracted for test seaming; takes plain strings so [FileContents] is not exposed.
      */
     internal fun computePreviewLeftContent(
@@ -313,7 +245,7 @@ class SplitDialog(
         afterContent: String
     ): String = when {
         override != null -> override
-        isTicked != newParent -> baseContent
+        !isTicked -> baseContent
         else -> afterContent
     }
 
@@ -336,11 +268,7 @@ class SplitDialog(
                 baseContent = data.before,
                 afterContent = data.after,
                 initialContent = initialContent,
-                labels = if (newParent) {
-                    HunkPickerLabels.forSplitNewParent(firstCommitLabel, secondCommitLabel)
-                } else {
-                    HunkPickerLabels.forSplit(firstCommitLabel, secondCommitLabel)
-                }
+                labels = HunkPickerLabels.forSplitNewParent(firstCommitLabel, secondCommitLabel)
             )
 
         if (pickedContent == null) return // user cancelled — keep prior state
@@ -352,29 +280,28 @@ class SplitDialog(
 
     /**
      * Apply a hunk-picker result for [fp]. Fully-none/fully-all results are genuinely resolved
-     * states and adjust the tick accordingly (which tick each maps to flips under [newParent],
-     * see [computePreviewLeftContent]); anything else is a genuine partial, which stores
+     * states and adjust the tick accordingly (see [computePreviewLeftContent]); anything else is
+     * a genuine partial, which stores
      * the parent-remainder override but **deliberately leaves the tick state untouched**.
      *
      * The tick is inert once an override exists — every downstream read of a file's content
      * (`doOKAction`, the preview) checks the override first. Force-ticking a partial file here
-     * previously made a half-picked file look fully committed to the child, which wasn't true;
+     * would make a half-picked file look fully committed, which wouldn't be true;
      * the half-checked render (`partialChanges`, synced by the caller's `updateSummary()`) is
      * what should communicate "partial" to the user, not the tick.
      */
     internal fun applyPickedContent(fp: FilePath, pickedContent: String, baseContent: String, afterContent: String) {
         when (pickedContent) {
             baseContent -> {
-                // Lower commit gets nothing: by default the file fully moved to the new commit
-                // (tick); under -B the new commit is the lower one, so nothing moved (untick).
+                // Lower commit gets nothing: nothing is committed (untick).
                 firstCommitOverrides.remove(fp)
-                if (newParent) ensureFileExcluded(fp) else ensureFileIncluded(fp)
+                ensureFileExcluded(fp)
             }
 
             afterContent -> {
                 // Lower commit gets everything: the mirror image of the case above.
                 firstCommitOverrides.remove(fp)
-                if (newParent) ensureFileIncluded(fp) else ensureFileExcluded(fp)
+                ensureFileIncluded(fp)
             }
 
             else -> {
@@ -395,45 +322,14 @@ class SplitDialog(
         previousIncluded = fileSelection.includedChanges.map { it.filePath }.toSet()
     }
 
-    // ---- Dynamic labels ----
-
-    /**
-     * One identity-first vocabulary in every mode (jj-idea-8khi, GitHub #101 UX follow-up):
-     * `parentHeaderLabel`/`parentDescriptionEditor` etc. keep their field names for the "stays"
-     * side and `child*` for the "new commit" side (matching [SplitSpec]'s existing terms), but
-     * the *text* they render no longer varies between "Parent"/"Child" and "First"/"Second" - see
-     * class KDoc. Only the new-commit header's parenthetical (child/sibling/parent of …) and the
-     * mode note's body vary with mode.
-     */
-    private fun updateDynamicLabels() {
-        firstCommitLabel = legendLabel("dialog.split.legend.stays")
-        secondCommitLabel = legendLabel("dialog.split.legend.new")
-
-        parentHeaderLabel.setStyledText("dialog.split.stays.header", sourceEntry.id, bold = true)
-
-        val newHeaderKey = when {
-            newParent -> "dialog.split.new.header.parent"
-            parallelCheckBox.isSelected -> "dialog.split.new.header.parallel"
-            else -> "dialog.split.new.header.child"
-        }
-        childHeaderLabel.setStyledText(newHeaderKey, sourceEntry.id, bold = true)
-
-        val noteKey = when {
-            newParent -> "dialog.split.note.parent"
-            parallelCheckBox.isSelected -> "dialog.split.note.parallel"
-            else -> "dialog.split.note.child"
-        }
-        modeNoteLabel.setStyledText(noteKey, sourceEntry.id)
-    }
-
     private fun updateSummary() {
-        val childFiles = fileSelection.includedChanges.size // ticked = moving to child
+        val childFiles = fileSelection.includedChanges.size // ticked = committed
         val totalFiles = allChanges.size
         val parentFiles = totalFiles - childFiles
         val partialCount = firstCommitOverrides.size
 
         // Partial files contribute hunks to both commits, so they appear in both counts.
-        // Child first, matching its position above the parent in the log.
+        // Committed side first.
         summaryLabel.text = if (partialCount > 0) {
             JujutsuBundle.message(
                 "dialog.split.summary.partial",
@@ -487,14 +383,10 @@ class SplitDialog(
 
     private fun createSourceSection() = JPanel().apply {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
-        add(createSectionLabel(JujutsuBundle.message("dialog.split.source")))
+        add(createSectionLabel(JujutsuBundle.message("dialog.commit.source")))
         add(createEntryPane(sourceEntry))
-        if (workingCopyNoteLabel.isVisible) {
-            workingCopyNoteLabel.alignmentX = JLabel.LEFT_ALIGNMENT
-            add(workingCopyNoteLabel)
-        }
-        modeNoteLabel.alignmentX = JLabel.LEFT_ALIGNMENT
-        add(modeNoteLabel)
+        noteLabel.alignmentX = JLabel.LEFT_ALIGNMENT
+        add(noteLabel)
         add(Box.createVerticalStrut(JBUI.scale(8)))
         add(createSectionLabel(JujutsuBundle.message("dialog.split.files")))
     }
@@ -516,32 +408,7 @@ class SplitDialog(
             border = JBUI.Borders.empty(8)
         }
 
-        val childBlock = descriptionBlock(childHeaderLabel, childDescriptionEditor)
-        val parentBlock = descriptionBlock(parentHeaderLabel, parentDescriptionEditor)
-
-        if (newParent) {
-            // parentHeaderLabel/parentDescriptionEditor is the *unticked* pane here, i.e. the
-            // "Stays here" side - shown first (top) since it occupies the more-recent, unmoved
-            // position, matching where it already sits in the log; childHeaderLabel/
-            // childDescriptionEditor ("New commit") is the newly-inserted *older* parent, shown
-            // second (bottom) to match its position one row further down the log.
-            panel.add(parentBlock)
-            panel.add(Box.createVerticalStrut(JBUI.scale(6)))
-            panel.add(childBlock)
-        } else {
-            // New-commit description first: matches its position above the stays-here side in
-            // the log when it's a child (default mode); an arbitrary but stable choice when it's
-            // a sibling (--parallel), which has no "above" position of its own.
-            panel.add(childBlock)
-            panel.add(Box.createVerticalStrut(JBUI.scale(6)))
-            panel.add(parentBlock)
-        }
-
-        panel.add(Box.createVerticalStrut(JBUI.scale(4)))
-
-        // Parallel checkbox.
-        parallelCheckBox.alignmentX = JPanel.LEFT_ALIGNMENT
-        panel.add(parallelCheckBox)
+        panel.add(descriptionBlock(headerLabel, descriptionEditor))
 
         return panel
     }
@@ -583,23 +450,14 @@ class SplitDialog(
     private val isPartialSplit: Boolean get() = firstCommitOverrides.isNotEmpty()
 
     override fun doValidate(): ValidationInfo? {
-        val included = fileSelection.includedChanges // ticked = moving to the new commit
-        val total = allChanges.size
+        val included = fileSelection.includedChanges // ticked = committed
 
         // Nothing ticked is only truly empty if there's also no partial hunk pick - a
-        // hunks-only split (GitHub #117) leaves every tick untouched but has real content
-        // to move via firstCommitOverrides. Mode-independent messages (jj-idea-8khi): ticking
-        // always means "move to the new commit" and staying always means "stays here", in every
-        // mode - see class KDoc.
+        // hunks-only commit (GitHub #117) leaves every tick untouched but has real content
+        // to commit via firstCommitOverrides. Everything ticked is fine: it commits everything.
         if (included.isEmpty() && !isPartialSplit) {
             return ValidationInfo(
-                JujutsuBundle.message("dialog.split.validation.new.empty"),
-                fileSelection.changesTree
-            )
-        }
-        if (included.size == total && firstCommitOverrides.isEmpty()) {
-            return ValidationInfo(
-                JujutsuBundle.message("dialog.split.validation.stays.empty"),
+                JujutsuBundle.message("dialog.commit.validation.empty"),
                 fileSelection.changesTree
             )
         }
@@ -612,28 +470,21 @@ class SplitDialog(
         val ticked = fileSelection.includedChanges.toList()
         val tickedPaths = ticked.map { it.filePath }.toSet()
 
-        // Which pane's files become the fileset passed to `jj split` (its "selected" argument)
-        // depends on mode: in newParent mode, `-B` makes the ticked pane the new commit; in the
-        // default mode, the unticked pane keeps the original ID and is what gets passed instead
-        // (see SplitSpec's KDoc).
-        val selectedPaths = if (newParent) {
-            ticked.map { it.filePath }
-        } else {
-            allChanges.map { it.filePath }.filter { it !in tickedPaths }
-        }
+        // The ticked pane's files become the fileset passed to `jj commit` (its "selected"
+        // argument) - see CommitSpec's KDoc.
+        val selectedPaths = ticked.map { it.filePath }
 
         val hunkSelection: HunkSelection? = if (isPartialSplit) {
             // Build the first commit's content for every changed file.
             // buildHunkSelection's "included" means "written into the staging tree", i.e. the change
-            // lands in the LOWER commit: the unticked files by default (ticked ones move to the
-            // child), the ticked files under -B (the new parent). Deletions of such files go
+            // lands in the LOWER commit: the ticked files (the committed change). Deletions of such files go
             // through the deletion manifest (an empty `after` would otherwise be written as an
             // empty file, jj-idea-5g8h).
             buildHunkSelection(
                 changes = allChanges,
                 root = sourceEntry.repo.directory,
                 overrides = firstCommitOverrides,
-                isIncluded = { (it in tickedPaths) == newParent },
+                isIncluded = { it in tickedPaths },
                 isDeletion = { it.afterRevision == null },
                 contentFor = { change, landsInFirstCommit ->
                     if (landsInFirstCommit) previewController.cachedContents(change.filePath)?.after else null
@@ -643,23 +494,10 @@ class SplitDialog(
             null
         }
 
-        val parentFieldText = parentDescriptionEditor.text.actual.trim()
-        val childFieldText = childDescriptionEditor.text.actual.trim()
-        val originalDesc = sourceEntry.description.actual
-
-        // Route by role, not by pane: the selected side (see selectedPaths above) always gets
-        // -m; the remaining side always gets the follow-up describe.
-        val selectedFieldText = if (newParent) childFieldText else parentFieldText
-        val remainingFieldText = if (newParent) parentFieldText else childFieldText
-
-        result = SplitSpec(
-            revision = sourceEntry.id,
+        result = CommitSpec(
             filePaths = selectedPaths,
             hunkSelection = hunkSelection,
-            selectedDescription = Description(selectedFieldText),
-            remainingDescription = if (remainingFieldText != originalDesc) Description(remainingFieldText) else null,
-            parallel = if (newParent) false else parallelCheckBox.isSelected,
-            insertBefore = if (newParent) sourceEntry.id else null
+            description = Description(descriptionEditor.text.actual.trim())
         )
         super.doOKAction()
     }
@@ -685,17 +523,14 @@ class SplitDialog(
     @org.jetbrains.annotations.TestOnly
     internal fun doValidateForTest() = doValidate()
 
-    /** Current parent description text (for testing). */
-    internal val parentDescriptionText: String get() = parentDescriptionEditor.text.actual
+    /** Current description text (for testing). */
+    internal val descriptionText: String get() = descriptionEditor.text.actual
 
-    /** Current child description text (for testing). */
-    internal val childDescriptionText: String get() = childDescriptionEditor.text.actual
+    /** Current note text (for testing). */
+    internal val noteText: String get() = noteLabel.text
 
-    /** Current mode note text (for testing). */
-    internal val modeNoteText: String get() = modeNoteLabel.text
-
-    /** The mode note's own component, to check it doesn't force a wide preferred size (for testing). */
-    internal val modeNoteComponent: JComponent get() = modeNoteLabel
+    /** The note's own component, to check it doesn't force a wide preferred size (for testing). */
+    internal val noteComponent: JComponent get() = noteLabel
 }
 
 /** Capitalize a legend bundle key value (e.g. "parent" → "Parent"). */

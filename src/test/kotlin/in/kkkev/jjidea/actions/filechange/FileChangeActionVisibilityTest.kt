@@ -695,6 +695,31 @@ class FileChangeActionVisibilityTest {
         }
     }
 
+    // ── CommitFilesAction ─────────────────────────────────────────────────────
+
+    @Nested
+    inner class `CommitFiles` {
+        @Test
+        fun `hidden when no LOG_ENTRY and no repo resolution`() {
+            CommitFilesAction().update(event)
+            presentation.isEnabledAndVisible shouldBe false
+        }
+
+        @Test
+        fun `visible for the working copy entry`() {
+            withLogEntry(workingCopyEntry())
+            CommitFilesAction().update(event)
+            presentation.isEnabledAndVisible shouldBe true
+        }
+
+        @Test
+        fun `hidden for a mutable historical entry - jj commit only acts on the working copy`() {
+            withLogEntry(historicalEntry(immutable = false))
+            CommitFilesAction().update(event)
+            presentation.isEnabledAndVisible shouldBe false
+        }
+    }
+
     // ── OpenFileInRemoteGroup ─────────────────────────────────────────────────
 
     @Nested

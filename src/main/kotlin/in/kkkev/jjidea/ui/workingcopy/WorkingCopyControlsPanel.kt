@@ -13,6 +13,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.bookmark.advanceClosestBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.createBookmarkAction
 import `in`.kkkev.jjidea.actions.change.abandonChangeAction
+import `in`.kkkev.jjidea.actions.change.commitAction
 import `in`.kkkev.jjidea.actions.change.splitAction
 import `in`.kkkev.jjidea.actions.change.squashAction
 import `in`.kkkev.jjidea.actions.change.squashableEntry
@@ -205,7 +206,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     }
 
     /**
-     * The action-only half of [createTopBar] — actions anchored at `@` (New Change plus the
+     * The action-only half of [createTopBar] — actions anchored at `@` (New Change, Commit, plus the
      * working copy's share of the log context menu). Built once, each action added exactly once:
      * `ActionToolbarImpl` requires stable action *instances* across refreshes to reuse each
      * button's `JComponent`, so `update()` on each just flips `isEnabled` from live state, the
@@ -217,6 +218,15 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             override fun getActionUpdateThread() = ActionUpdateThread.EDT
         }
         group.add(newChangeAction())
+        group.add(
+            stableAction(
+                JujutsuBundle.message("log.action.commit"),
+                JujutsuBundle.message("log.action.commit.tooltip"),
+                AllIcons.Actions.Commit,
+                isEnabled = { currentWorkingCopy() != null },
+                delegate = { commitAction(project, currentWorkingCopy()) }
+            )
+        )
         group.add(
             stableAction(
                 JujutsuBundle.message("log.action.split"),
