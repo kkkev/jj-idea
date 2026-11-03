@@ -5,7 +5,7 @@ import `in`.kkkev.jjidea.jj.OperationEntry
 import `in`.kkkev.jjidea.ui.log.RootFilterSelection
 
 /** One row of the Operations tab: an operation and the repository it belongs to. */
-internal data class OperationRow(val repo: JujutsuRepository, val entry: OperationEntry)
+data class OperationRow(val repo: JujutsuRepository, val entry: OperationEntry)
 
 /**
  * Merges the selected repositories' operation logs into one list, newest first. Repos hidden by

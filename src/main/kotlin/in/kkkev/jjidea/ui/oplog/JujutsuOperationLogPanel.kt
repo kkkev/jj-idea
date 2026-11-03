@@ -5,30 +5,28 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.ToggleAction
-import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.Messages
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.ManagedActions
+import `in`.kkkev.jjidea.actions.add
 import `in`.kkkev.jjidea.actions.undo.RedoAction
 import `in`.kkkev.jjidea.actions.undo.UndoAction
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.OperationEntry
-import `in`.kkkev.jjidea.jj.OperationId
-import `in`.kkkev.jjidea.jj.WorkingCopy
-import `in`.kkkev.jjidea.jj.createCommand
-import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
 import `in`.kkkev.jjidea.ui.log.JujutsuRootFilterComponent
 import `in`.kkkev.jjidea.ui.log.JujutsuRootGutterRenderer
-import `in`.kkkev.jjidea.ui.services.performUndo
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import kotlinx.datetime.Instant
@@ -54,7 +52,9 @@ import javax.swing.table.TableColumn
  */
 internal class JujutsuOperationLogPanel(private val project: Project, initialRepo: JujutsuRepository) :
     JPanel(BorderLayout()),
-    Disposable {
+    Disposable,
+    UiDataProvider,
+    OperationLogView {
     private fun repos() = project.stateModel.initialisedRepositories.value.values.toList()
     private val loaders = mutableMapOf<JujutsuRepository, OperationLogLoader>()
 
@@ -84,7 +84,7 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
             return when (column) {
                 0 -> shownRow.entry.title()
                 GUTTER_MODEL_COLUMN -> shownRow
-                1 -> shownRow.entry.args.removePrefix("args: ")
+                1 -> shownRow.entry.command()
                 else -> shownRow.entry.time
             }
         }
@@ -108,7 +108,7 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
         installGutter()
         add(buildNorth(), BorderLayout.NORTH)
         add(ScrollPaneFactory.createScrollPane(table), BorderLayout.CENTER)
-        PopupHandler.installPopupMenu(table, buildRowActions(), "JujutsuOperationLogPopup")
+        PopupHandler.installPopupMenu(table, buildPopupActions(), "JujutsuOperationLogPopup")
         project.stateModel.logRefresh.connect(this) { refresh() }
         // Start focused on the repo the tab was opened from; any later change reloads what is newly shown.
         rootFilter.initialize {
@@ -121,15 +121,7 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
     private fun buildNorth(): JPanel {
         val north = JPanel(BorderLayout())
         val group = DefaultActionGroup().apply {
-            add(object : DumbAwareAction(
-                JujutsuBundle.message("oplog.action.refresh"),
-                null,
-                AllIcons.Actions.Refresh
-            ) {
-                override fun getActionUpdateThread() = ActionUpdateThread.BGT
-
-                override fun actionPerformed(e: AnActionEvent) = refresh()
-            })
+            add(ManagedActions["Jujutsu.Oplog.Refresh"])
             add(object : ToggleAction(
                 JujutsuBundle.message("oplog.action.snapshots"),
                 null,
@@ -144,6 +136,7 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
                     applyFilter()
                 }
             })
+            add(ManagedActions["Jujutsu.Oplog.GoToCurrent"])
             add(Separator.getInstance())
             // jj-idea-x30x: repository-wide Undo/Redo of the head operation, ahead of the per-row actions.
             // Acts on the selected row's repository, else the only repository being shown.
@@ -151,7 +144,7 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
             add(UndoAction(shownRepo))
             add(RedoAction(shownRepo))
             add(Separator.getInstance())
-            add(buildRowActions())
+            add(revertRestoreActions())
         }
         val toolbar = ActionManager.getInstance().createActionToolbar("JujutsuOperationLogToolbar", group, true)
         toolbar.targetComponent = table
@@ -164,69 +157,42 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
     }
 
     /** Revert (primary), then - separated, labelled as a reset - Restore. Shared by toolbar and popup. */
-    private fun buildRowActions() = DefaultActionGroup().apply {
-        add(object : DumbAwareAction(
-            JujutsuBundle.message("oplog.action.revert"),
-            JujutsuBundle.message("oplog.action.revert.description"),
-            AllIcons.Actions.Rollback
-        ) {
-            override fun getActionUpdateThread() = ActionUpdateThread.EDT
-
-            override fun update(e: AnActionEvent) = applyState(e, revertState(selected()?.entry))
-
-            override fun actionPerformed(e: AnActionEvent) {
-                val row = selected() ?: return
-                performUndo(project, row.repo, row.entry.id)
-            }
-        })
+    private fun revertRestoreActions() = DefaultActionGroup().apply {
+        add(ManagedActions["Jujutsu.Oplog.Revert"])
         add(Separator.getInstance())
-        add(object : DumbAwareAction(
-            JujutsuBundle.message("oplog.action.restore"),
-            JujutsuBundle.message("oplog.action.restore.description"),
-            null
-        ) {
-            override fun getActionUpdateThread() = ActionUpdateThread.EDT
-
-            override fun update(e: AnActionEvent) = applyState(
-                e,
-                selected()?.let { restoreState(it.entry, perRepo[it.repo]?.firstOrNull()) }
-                    ?: restoreState(null, null)
-            )
-
-            override fun actionPerformed(e: AnActionEvent) {
-                val row = selected() ?: return
-                restore(row)
-            }
-        })
+        add(ManagedActions["Jujutsu.Oplog.Restore"])
     }
 
-    private fun applyState(e: AnActionEvent, state: RowActionState) {
-        e.presentation.isEnabled = state.enabled
-        state.disabledReason?.let { e.presentation.description = it }
+    /** The popup: the toolbar's row actions, then the copy actions, then navigation. */
+    private fun buildPopupActions() = DefaultActionGroup().apply {
+        add(revertRestoreActions())
+        add(Separator.getInstance())
+        add(ManagedActions["Jujutsu.Oplog.CopyId"])
+        add(ManagedActions["Jujutsu.Oplog.CopyDescription"])
+        add(ManagedActions["Jujutsu.Oplog.CopyCommand"])
+        add(Separator.getInstance())
+        add(ManagedActions["Jujutsu.Oplog.GoToCurrent"])
     }
 
-    private fun restore(row: OperationRow) {
-        val later = perRepo[row.repo].orEmpty().indexOfFirst { it.id == row.entry.id }.coerceAtLeast(0)
-        val choice = Messages.showYesNoDialog(
-            project,
-            restoreConfirmMessage(row.entry, later),
-            JujutsuBundle.message("oplog.restore.confirm.title"),
-            JujutsuBundle.message("oplog.action.restore.confirm"),
-            Messages.getCancelButton(),
-            Messages.getWarningIcon()
-        )
-        if (choice != Messages.YES) return
-        restoreOperation(row.repo, row.entry.id)
+    override fun uiDataSnapshot(sink: DataSink) {
+        sink[JujutsuDataKeys.OPERATION_LOG] = this
+        selected()?.let { sink[JujutsuDataKeys.OPERATION_ROW] = it }
     }
 
-    private fun restoreOperation(target: JujutsuRepository, id: OperationId) {
-        target.createCommand { opRestore(id) }
-            .onSuccess { invalidate(select = WorkingCopy, vfsChanged = true) }
-            .onFailure { tellUser("notification.oplog.restore.error") }
-            .executeAsync()
+    override fun head(repo: JujutsuRepository) = perRepo[repo]?.firstOrNull()
+
+    override fun laterCount(row: OperationRow) =
+        perRepo[row.repo].orEmpty().indexOfFirst { it.id == row.entry.id }.coerceAtLeast(0)
+
+    override fun goToHeadState() = goToHeadState(shown, selected())
+
+    override fun goToHead() {
+        val index = headRow(shown, selected())?.let(shown::indexOf)?.takeIf { it >= 0 } ?: return
+        table.setRowSelectionInterval(index, index)
+        table.scrollRectToVisible(table.getCellRect(index, 0, true))
     }
 
-    private fun refresh() {
+    override fun refresh() {
         val selection = rootFilter.selection()
         val all = repos()
         runInBackground {

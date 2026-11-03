@@ -14,6 +14,8 @@ import com.intellij.util.concurrency.annotations.RequiresEdt
 import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.oplog.OperationLogView
+import `in`.kkkev.jjidea.ui.oplog.OperationRow
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
@@ -48,6 +50,12 @@ val AnActionEvent.logNeighbours: JujutsuDataKeys.LogNeighbours? get() = this.get
 
 /** The single selected bookmark row in the bookmarks panel (jj-idea-ib1i), or `null` if none. */
 val AnActionEvent.bookmarkTarget: JujutsuDataKeys.BookmarkTarget? get() = this.getData(JujutsuDataKeys.BOOKMARK_TARGET)
+
+/** The selected row of the Operations tab (jj-idea-jpfx.2), or `null` if none. */
+val AnActionEvent.operationRow: OperationRow? get() = this.getData(JujutsuDataKeys.OPERATION_ROW)
+
+/** The Operations tab the event comes from, or `null` outside it. */
+val AnActionEvent.operationLog: OperationLogView? get() = this.getData(JujutsuDataKeys.OPERATION_LOG)
 
 /** The full multi-select bookmarks-panel selection, or empty if none. */
 val AnActionEvent.bookmarkTargets: List<JujutsuDataKeys.BookmarkTarget>

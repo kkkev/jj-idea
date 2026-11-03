@@ -190,6 +190,21 @@
          the action hides itself unless the feature is enabled. -->
     <action id="Jujutsu.ShowOperationLog" class="in.kkkev.jjidea.actions.undo.ShowOperationLogAction"/>
 
+    <!-- Operations tab actions (jj-idea-jpfx.2): keymap-assignable, unbound by default. Row actions read the
+         selection from JujutsuDataKeys.OPERATION_ROW and the panel-scoped ones from OPERATION_LOG, both published
+         by JujutsuOperationLogPanel.uiDataSnapshot; toolbar and popup reference these same instances.
+         Copy ID and Refresh follow the platform Copy / Refresh shortcuts (shown in the toolbar tooltip and menu, and
+         listed in Settings > Keymap); they are disabled/hidden outside the tab so they never shadow other contexts. -->
+    <action id="Jujutsu.Oplog.Revert" class="in.kkkev.jjidea.actions.oplog.RevertOperationAction"/>
+    <action id="Jujutsu.Oplog.Restore" class="in.kkkev.jjidea.actions.oplog.RestoreOperationAction"/>
+    <action id="Jujutsu.Oplog.CopyId" class="in.kkkev.jjidea.actions.oplog.CopyOperationIdAction"
+            use-shortcut-of="$Copy"/>
+    <action id="Jujutsu.Oplog.CopyDescription" class="in.kkkev.jjidea.actions.oplog.CopyOperationDescriptionAction"/>
+    <action id="Jujutsu.Oplog.CopyCommand" class="in.kkkev.jjidea.actions.oplog.CopyOperationCommandAction"/>
+    <action id="Jujutsu.Oplog.GoToCurrent" class="in.kkkev.jjidea.actions.oplog.GoToCurrentOperationAction"/>
+    <action id="Jujutsu.Oplog.Refresh" class="in.kkkev.jjidea.actions.oplog.RefreshOperationLogAction"
+            use-shortcut-of="Refresh"/>
+
     <!-- Quick action to change the diff base for gutter markers/Annotate (jj-idea-g1io, GitHub #43),
          in addition to the permanent per-project/per-repo setting in Settings > Version Control > Jujutsu. -->
     <action id="Jujutsu.SetDiffBase" class="in.kkkev.jjidea.actions.diffbase.SetDiffbaseAction"/>

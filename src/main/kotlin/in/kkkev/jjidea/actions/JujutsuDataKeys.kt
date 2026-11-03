@@ -8,6 +8,8 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.oplog.OperationLogView
+import `in`.kkkev.jjidea.ui.oplog.OperationRow
 
 /**
  * Data keys for Jujutsu-specific action context.
@@ -107,4 +109,16 @@ object JujutsuDataKeys {
         val id: ChangeId? = null,
         val hidden: Boolean = false
     )
+
+    /**
+     * The selected operation (and its repository) in the Operations tab (jj-idea-jpfx.2), published by
+     * [in.kkkev.jjidea.ui.oplog.JujutsuOperationLogPanel.uiDataSnapshot] so the registered `Jujutsu.Oplog.*` actions
+     * are keymap-assignable, like [BOOKMARK_TARGET].
+     */
+    @JvmField
+    val OPERATION_ROW: DataKey<OperationRow> = DataKey.create("Jujutsu.OperationRow")
+
+    /** The Operations tab itself, for actions that act on the tab rather than a row (Refresh, Go to Current). */
+    @JvmField
+    val OPERATION_LOG: DataKey<OperationLogView> = DataKey.create("Jujutsu.OperationLog")
 }
