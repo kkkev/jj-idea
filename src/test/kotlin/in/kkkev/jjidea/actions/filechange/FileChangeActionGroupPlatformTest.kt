@@ -34,6 +34,7 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.RestoreFile",
             "Jujutsu.RestoreToChange",
             "Jujutsu.DropChanges",
+            "Jujutsu.CommitFiles",
             "Jujutsu.SquashFiles",
             "Jujutsu.SplitFiles",
             "Jujutsu.SplitIntoNewParentFiles",
@@ -59,6 +60,7 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.ShowFileHistory",
             "Jujutsu.RestoreFile",
             "Jujutsu.RestoreToChange",
+            "Jujutsu.CommitFiles",
             "Jujutsu.SquashFiles",
             "Jujutsu.SplitFiles",
             "Jujutsu.SplitIntoNewParentFiles",
@@ -104,11 +106,12 @@ class FileChangeActionGroupPlatformTest {
     }
 
     @Test
-    fun `SquashFiles and SplitFiles appear in the second-to-last block`() {
+    fun `CommitFiles, SquashFiles and SplitFiles appear in the second-to-last block`() {
         val group = fileChangeActionGroup()
         val children = group.getChildren(null).toList()
         val blocks = splitBySeparators(children)
         blocks[blocks.size - 2].actionIds() shouldContainAll listOf(
+            "Jujutsu.CommitFiles",
             "Jujutsu.SquashFiles",
             "Jujutsu.SplitFiles",
             "Jujutsu.SplitIntoNewParentFiles"

@@ -13,9 +13,11 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.bookmark.advanceClosestBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.createBookmarkAction
 import `in`.kkkev.jjidea.actions.change.abandonChangeAction
+import `in`.kkkev.jjidea.actions.change.commitAction
 import `in`.kkkev.jjidea.actions.change.splitAction
 import `in`.kkkev.jjidea.actions.change.squashAction
 import `in`.kkkev.jjidea.actions.change.squashableEntry
+import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.requestDescription
 import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.actions.tag.setTagAction
@@ -205,7 +207,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     }
 
     /**
-     * The action-only half of [createTopBar] — actions anchored at `@` (New Change plus the
+     * The action-only half of [createTopBar] — actions anchored at `@` (New Change, Commit, plus the
      * working copy's share of the log context menu). Built once, each action added exactly once:
      * `ActionToolbarImpl` requires stable action *instances* across refreshes to reuse each
      * button's `JComponent`, so `update()` on each just flips `isEnabled` from live state, the
@@ -217,6 +219,16 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             override fun getActionUpdateThread() = ActionUpdateThread.EDT
         }
         group.add(newChangeAction())
+        group.add(
+            stableAction(
+                JujutsuBundle.message("log.action.commit"),
+                JujutsuBundle.message("log.action.commit.tooltip"),
+                AllIcons.Actions.Commit,
+                isEnabled = { currentWorkingCopy() != null },
+                // The tool window publishes the changes tree's selection as VcsDataKeys.CHANGES.
+                delegate = { commitAction(project, currentWorkingCopy(), it.filePaths.toSet()) }
+            )
+        )
         group.add(
             stableAction(
                 JujutsuBundle.message("log.action.split"),
@@ -305,27 +317,27 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
 
     /**
      * A stable toolbar [AnAction] whose [isEnabled] is recomputed from live state on every
-     * [update]; [delegate] is invoked only at click time, to run an existing by-value action
-     * factory (`splitAction`/`squashAction`/etc.) without duplicating its logic.
+     * [update]; [delegate] is invoked only at click time, with the click's event, to run an existing
+     * by-value action factory (`splitAction`/`squashAction`/etc.) without duplicating its logic.
      */
     private fun stableAction(
         text: String,
         description: String,
         icon: Icon,
         isEnabled: () -> Boolean,
-        delegate: () -> AnAction
+        delegate: (AnActionEvent) -> AnAction
     ): AnAction = object : DumbAwareAction(text, description, icon) {
         override fun update(e: AnActionEvent) {
             e.presentation.isEnabled = isEnabled()
         }
 
-        // Must not call delegate().actionPerformed(e) directly: AnAction.actionPerformed is
+        // Must not call delegate(e).actionPerformed(e) directly: AnAction.actionPerformed is
         // @ApiStatus.OverrideOnly (the platform's own contract, not one we impose) — the platform
         // marketplace's compatibility checker flags direct calls as a violation even though our
         // own verifyPlugin (which excludes that category) does not. ActionManager.tryToExecute is
         // the long-standing public, non-deprecated way to invoke an AnAction programmatically.
         override fun actionPerformed(e: AnActionEvent) {
-            ActionManager.getInstance().tryToExecute(delegate(), e.inputEvent, null, e.place, true)
+            ActionManager.getInstance().tryToExecute(delegate(e), e.inputEvent, null, e.place, true)
         }
 
         override fun getActionUpdateThread() = ActionUpdateThread.EDT

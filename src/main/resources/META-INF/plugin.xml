@@ -359,6 +359,7 @@
     <action id="Jujutsu.DropChanges" class="in.kkkev.jjidea.actions.filechange.DropChangesAction"/>
     <action id="Jujutsu.SquashFiles" class="in.kkkev.jjidea.actions.filechange.SquashFilesAction"/>
     <action id="Jujutsu.SquashIntoFiles" class="in.kkkev.jjidea.actions.filechange.SquashIntoFilesAction"/>
+    <action id="Jujutsu.CommitFiles" class="in.kkkev.jjidea.actions.filechange.CommitFilesAction"/>
     <action id="Jujutsu.SplitFiles" class="in.kkkev.jjidea.actions.filechange.SplitFilesAction"/>
     <action id="Jujutsu.SplitIntoNewParentFiles"
             class="in.kkkev.jjidea.actions.filechange.SplitIntoNewParentFilesAction"/>
@@ -400,6 +401,7 @@
       <reference ref="Jujutsu.AcceptConflictCurrentSide"/>
       <reference ref="Jujutsu.AcceptConflictLastSide"/>
       <separator/>
+      <reference ref="Jujutsu.CommitFiles"/>
       <reference ref="Jujutsu.SquashFiles"/>
       <reference ref="Jujutsu.SquashIntoFiles"/>
       <reference ref="Jujutsu.SplitFiles"/>

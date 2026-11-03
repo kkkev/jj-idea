@@ -590,6 +590,37 @@ interface CommandExecutor {
     ): CommandResult
 
     /**
+     * Commit the working copy: `jj commit`.
+     * @param filePaths The selected fileset passed to `jj commit` (empty = everything). The selected
+     *   fileset stays in the working copy's change, which gets [description]; everything else moves
+     *   to a new working-copy change on top.
+     * @param description Description for the *selected* fileset (`-m`)
+     * @return Command result
+     */
+    fun commit(
+        filePaths: List<FilePath> = emptyList(),
+        description: Description
+    ): CommandResult
+
+    /**
+     * Commit the working copy interactively using a diff editor tool.
+     *
+     * Uses `jj commit --tool <tool>` (implies `--interactive`), driven non-interactively by
+     * the IDE's diff-edit helper. The [configArgs] list contains `NAME=VALUE` strings that are
+     * prefixed with `--config` and prepended to the command (global jj options).
+     *
+     * @param description Description for the *selected* side (passed as `-m`)
+     * @param configArgs Extra `--config NAME=VALUE` entries (prepended before the subcommand)
+     * @param tool The diff-editor tool name registered via [configArgs]
+     * @return Command result
+     */
+    fun commitInteractive(
+        description: Description,
+        configArgs: List<String> = emptyList(),
+        tool: String
+    ): CommandResult
+
+    /**
      * List Git remotes.
      * @return Command result with remote names (one per line)
      */

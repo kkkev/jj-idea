@@ -277,6 +277,7 @@ src/main/kotlin/in/kkkev/jjidea/
 | `jj status` | List working copy changes | `JujutsuChangeProvider` |
 | `jj describe -r @ -m "msg"` | Set working copy description | "Describe" button |
 | `jj new [revision]` | Create new change | "New Change" button, context menu |
+| `jj commit -m "msg" [paths]` | Describe selected changes, move the rest to a new `@` | "Commit…" button, context menu |
 | `jj log -r @ --no-graph -T template` | Get log entries | `CliLogService` |
 | `jj file show -r @ path` | Get file content at revision | `JujutsuContentRevision` |
 | `jj file annotate -r @ -T template path` | Line-by-line attribution | `JujutsuAnnotationProvider` |

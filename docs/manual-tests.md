@@ -48,7 +48,7 @@ The short pass to run before every release, before deciding whether the full sec
 - [ ] Push a bookmark (dialog, confirmation for a new remote bookmark) and Fetch; a tag push if jj ≥ 0.44 (MT-GIT)
 
 **Working copy, diff and files**
-- [ ] Working Copy panel: describe `@`, New Change, change a file and see it listed with the right colour, open Restore… and restore one file (MT-WORKINGCOPY)
+- [ ] Working Copy panel: describe `@`, New Change, change a file and see it listed with the right colour, open Restore… and restore one file (MT-WORKINGCOPY); Commit… one of two changed files (MT-COMMIT)
 - [ ] Show Diff from the log and from the Working Copy panel opens a single preview tab that swaps on click; Annotate a file and click an annotation to select its change (MT-DIFF, MT-DIFF-PREVIEW)
 - [ ] Set Diff Base to "Latest immutable ancestor" and back: gutter markers follow (MT-DIFFBASE)
 - [ ] Ignored files are grey and appear under Ignored Files; the Tracked toggle on an ignored file works (MT-IGNORE)
@@ -76,12 +76,12 @@ Components whose blast radius exceeds their own package:
 | `ui/components/IconAwareTooltip.kt` (icon-aware tooltip installer, incl. `installIconAwareTableTooltip`) and `ui/log/LogPreviewTable.kt` (shared picker/preview table setup) | [MT-LOG-TABLE](#mt-log-table), [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash) |
 | Diff preview-tab helper (`ui/common/JujutsuEditorTabDiffPreview.kt`) | [MT-DIFF-PREVIEW](#mt-diff-preview), and its three referrers |
 | Shared post-operation graph preview (`ui/rebase/RebasePreviewPanel.kt`, `ui/rebase/RebaseSimulator.kt`, `ui/squash/SquashSimulator.kt`) | [MT-CTXMENU](#mt-ctxmenu) (Rebase / New Change dialogs), [MT-SQUASH](#mt-squash) |
-| In-dialog file diff preview shell (`ui/common/FileDiffPreviewPanel.kt`) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash) |
-| Shared hunk-pick preview cache/renderer (`ui/common/HunkPickPreviewController.kt`, `ui/common/HunkSelectionModel.kt`) and the diff-editor staging protocol (`diffedit/DiffEditTool.kt`, `diffedit/HunkApplyMain.kt`) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash) |
+| In-dialog file diff preview shell (`ui/common/FileDiffPreviewPanel.kt`) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-COMMIT](#mt-commit) |
+| Shared hunk-pick preview cache/renderer (`ui/common/HunkPickPreviewController.kt`, `ui/common/HunkSelectionModel.kt`) and the diff-editor staging protocol (`diffedit/DiffEditTool.kt`, `diffedit/HunkApplyMain.kt`) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-COMMIT](#mt-commit) |
 | Multi-repo scoping (root-aware actions/filters generally) | [MT-CROSS](#mt-cross), plus every section with a repo-scoped action |
 | `actions/filechange/FileChangeActionGroup.kt` (file-change right-click menu, via `JujutsuChangesTree.installHandlers()`) | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-CTXMENU](#mt-ctxmenu) (`JujutsuCompareChangesPanel`) |
-| `diffedit/HunkCheckboxDiffExtension.kt` + `diffedit/ClickableDiffGutter.kt` (plugin-wide `diff.DiffExtension`, gated to a no-op unless the request carries the hunk-checkbox session; the clickable-gutter helper is shared with the arrow extension below) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
-| `diffedit/HunkArrowDiffExtension.kt` (plugin-wide `diff.DiffExtension` — fires on every diff viewer the platform creates, gated to a no-op elsewhere) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
+| `diffedit/HunkCheckboxDiffExtension.kt` + `diffedit/ClickableDiffGutter.kt` (plugin-wide `diff.DiffExtension`, gated to a no-op unless the request carries the hunk-checkbox session; the clickable-gutter helper is shared with the arrow extension below) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-COMMIT](#mt-commit), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
+| `diffedit/HunkArrowDiffExtension.kt` (plugin-wide `diff.DiffExtension` — fires on every diff viewer the platform creates, gated to a no-op elsewhere) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-COMMIT](#mt-commit), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
 | `ui/editor/conflict/JujutsuConflictGutterInstaller.kt` (plugin-wide `editorFactoryListener` — fires on every editor the platform creates, gated to a no-op outside a main editor on a jj-tracked file) | [MT-CONFLICT](#mt-conflict), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview), [MT-DIFFBASE](#mt-diffbase) (shares the gutter), [MT-WORKINGCOPY](#mt-workingcopy) (its preview tabs open editors this listener sees), [MT-CROSS](#mt-cross) (multi-repo scoping of the repo-detection gate) |
 | `vcs/diffbase/DiffbaseService.kt` (shared base-revision resolver) | [MT-DIFFBASE](#mt-diffbase), [MT-DIFF](#mt-diff) (Annotate), [MT-WORKINGCOPY](#mt-workingcopy) (gutter markers) |
 | `actions/diffbase/SetDiffbaseAction.kt` (quick action) | [MT-DIFFBASE](#mt-diffbase), [MT-CTXMENU](#mt-ctxmenu) (shares `RevisionSelectorPopup`), [MT-CROSS](#mt-cross) (multi-repo submenu) |
@@ -873,6 +873,23 @@ state/routing logic, not rendering)
 - [ ] With no partial hunk selection (all files fully ticked or unticked), the split completes via file-level `jj split` (no diff-editor overhead); both commits have the expected files in the log
 - [ ] A binary file in the changed list shows no "Pick Hunks…" button (whole-file only)
 
+### MT-COMMIT
+
+**Commit the working copy (`jj commit`)**
+
+**Code:** `ui/commit/CommitDialog.kt`, `actions/change/commitAction.kt`, `actions/filechange/CommitFilesAction.kt`
+**Also re-run:** MT-SPLIT (the dialog is derived from Split into New Parent and shares `ui/common/FileDiffPreviewPanel.kt`, `ui/common/HunkPickPreviewController.kt`, the hunk picker and the staging protocol); MT-WORKINGCOPY (toolbar button); MT-CTXMENU (log context menu entry)
+
+Setup: a scratch jj repo whose working copy has at least two changed files, one with **two separate** hunks.
+
+Model: the dialog works like "Split into New Parent" (MT-SPLIT), with one description: **ticked files are committed**, staying on `@`'s own change ID, which gets the description. Unticked files move to a **new** working-copy change on top, with no description.
+
+- [ ] The Working Copy toolbar's **Commit…** button (after New Change) opens the "Commit" dialog with the files selected in the Working Copy panel ticked, or every file ticked if none is selected; **Commit…** in the log context menu on the `@` row opens it with every file ticked. The dialog has the description pre-filled with `@`'s description, and a note under "Working copy": "Ticked files stay in the working-copy change (<shortid>) with this description; unticked files move to a new working-copy change on top of it." On any other log row the menu entry is disabled
+- [ ] Selecting files in the Working Copy panel (or the project view / editor) and right-clicking → **Commit…** opens the dialog with exactly those files ticked. The entry is hidden for files of a historical change in the commit details panel
+- [ ] Ticking one of two files and clicking **Commit**: `jj log` shows the committed change on the original change ID with the description and only that file, and a new empty-description `@` on top holding the other file. The log selects the committed change. The new `@` has the current time as its author date
+- [ ] Ticking every file is allowed and leaves an empty new `@`. With nothing ticked, OK is disabled with "Tick at least one file to commit"
+- [ ] Ticking a single hunk in the preview gutter (or via **Pick Hunks…**, with "Committed change (live)" in the middle pane) makes the file half-checked, and Commit leaves only that hunk in the committed change, with the other hunk in the new `@`. A ticked file deletion alongside a partial pick ends up as a deletion (`D`) in the committed change, not an empty file
+
 ### MT-BOOKMARK
 
 **Bookmark widget**
@@ -1017,7 +1034,7 @@ Setup: in a repo with a git remote, `jj bookmark create cl/X -r @`, add file `f`
 **Working copy panel, status bar widget, and tool window behavior**
 
 **Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `vcs/JujutsuRollbackEnvironment.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring), `ui/common/JujutsuFilePathIconProvider.kt` (repo-root icon in changes trees), `jj/WorkingCopyRecovery.kt`, `jj/JujutsuRepositoryHealth.kt`, `ui/restore/RestoreDialog.kt`, `actions/file/RestoreSelectionAction.kt`, `actions/filechange/RestoreToChangeAction.kt` (GitHub #84), `actions/filechange/DropChangesAction.kt` (GitHub #148)
-**Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping); MT-CTXMENU, MT-SQUASH, MT-SPLIT (Split/Squash/Abandon/Create Bookmark/Advance Bookmark/Set Tag are shared with the log context menu); MT-BOOKMARK (Advance Bookmark)
+**Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping); MT-CTXMENU, MT-SQUASH, MT-SPLIT, MT-COMMIT (Commit/Split/Squash/Abandon/Create Bookmark/Advance Bookmark/Set Tag are shared with the log context menu); MT-BOOKMARK (Advance Bookmark)
 
 #### Working Copy Panel
 
@@ -1026,7 +1043,7 @@ Setup: in a repo with a git remote, `jj bookmark create cl/X -r @`, add file `f`
 - [ ] With IdeaVim installed: describing the working copy, entering Insert mode in the description field and pressing Escape leaves Insert mode and does not close or cancel anything (the requester's headline ask on GitHub #46; if Escape does something else, note what and whether `:set ideavimsupport=dialog` changes it)
 - [ ] With an Issue Navigation pattern configured (Settings → Version Control → Issue Navigation, e.g. `[A-Z]+-\d+` → `https://example.com/browse/$0`), an issue reference like `JIRA-123` inside a bookmark name in the current-change summary (above the description area) renders as a clickable link that opens the URL (GitHub #15)
 - [ ] "Describe" updates the description via `jj describe`; "New Change" creates a new change via `jj new`
-- [ ] The toolbar row also offers Split, Squash, Abandon, a separator, then Create Bookmark, Advance Bookmark and Set Tag, all acting on `@` and icon-only (tooltip-only labels). **Verify every one is actually visible in the row**, not collapsed behind an overflow `>>` chevron or silently missing. Each behaves like its log context-menu counterpart (see MT-CTXMENU, MT-SQUASH, MT-SPLIT, MT-BOOKMARK) and greys out (never disappears) when not applicable to the current `@`, e.g. Squash with no mutable parent, Advance with no ancestor bookmark (GitHub #61)
+- [ ] The toolbar row also offers Commit, Split, Squash, Abandon, a separator, then Create Bookmark, Advance Bookmark and Set Tag, all acting on `@` and icon-only (tooltip-only labels). **Verify every one is actually visible in the row**, not collapsed behind an overflow `>>` chevron or silently missing. Each behaves like its log context-menu counterpart (see MT-CTXMENU, MT-SQUASH, MT-SPLIT, MT-COMMIT, MT-BOOKMARK) and greys out (never disappears) when not applicable to the current `@`, e.g. Squash with no mutable parent, Advance with no ancestor bookmark (GitHub #61)
 - [ ] In a multi-root project the repo selector dropdown sits in the same row as this toolbar (top of the tool window), visually adjacent to it. Choosing a different repo there immediately updates the toolbar buttons (each re-evaluated against the newly selected repo) and the description/current-change area below
 - [ ] The changed-files tree shows correct status colours and file type icons, and right-click shows the file actions menu, which does **not** contain "Compare Before with Another Commit..." (working-copy context, same as "Compare Before with Local"). Preview-tab behaviour (double-click, Enter, tab-swap, single-click-no-op-when-closed, single-click-swap-when-open, Escape, Cmd/Ctrl+D, F4) is MT-DIFF-PREVIEW
 - [ ] Open shows the working copy as editable, and Open for multiple files opens multiple editors. The menu has Open in → remote (see MT-DIFF for "Open in → remote for single parent" and the hidden-when-no-pushed-ancestor case)
