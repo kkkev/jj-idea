@@ -28,6 +28,7 @@ import `in`.kkkev.jjidea.actions.git.GitPushDialog
 import `in`.kkkev.jjidea.actions.git.manageRemotesEnabled
 import `in`.kkkev.jjidea.actions.git.showManageRemotes
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.jj.OpHeadPollService
 import `in`.kkkev.jjidea.jj.cli.Config
 import `in`.kkkev.jjidea.jj.cli.config
 import `in`.kkkev.jjidea.jj.cli.rootlessConfig
@@ -303,6 +304,38 @@ class JujutsuConfigurable(
                 label(JujutsuBundle.message("settings.general.auto.fetch.minutes"))
             }.rowComment(
                 JujutsuBundle.message("settings.general.auto.fetch.comment"),
+                maxLineLength = NARROW_COMMENT_WIDTH
+            )
+            lateinit var opPoll: Cell<JBCheckBox>
+            row {
+                opPoll = checkBox(JujutsuBundle.message("settings.general.op.poll"))
+                    .bindSelected(
+                        { settings.state.opHeadPollIntervalSeconds > 0 },
+                        {
+                            if (!it) {
+                                settings.state.opHeadPollIntervalSeconds = 0
+                            } else if (settings.state.opHeadPollIntervalSeconds <= 0) {
+                                settings.state.opHeadPollIntervalSeconds = JujutsuSettings.OP_HEAD_POLL_DEFAULT_SECONDS
+                            }
+                        }
+                    )
+                label(JujutsuBundle.message("settings.general.op.poll.every"))
+                spinner(JujutsuSettings.OP_HEAD_POLL_MIN_SECONDS..JujutsuSettings.OP_HEAD_POLL_MAX_SECONDS)
+                    .bindIntValue(
+                        {
+                            settings.state.opHeadPollIntervalSeconds.takeIf { it > 0 }
+                                ?: JujutsuSettings.OP_HEAD_POLL_DEFAULT_SECONDS
+                        },
+                        {
+                            if (settings.state.opHeadPollIntervalSeconds > 0) {
+                                settings.state.opHeadPollIntervalSeconds = it
+                            }
+                        }
+                    )
+                    .enabledIf(opPoll.selected)
+                label(JujutsuBundle.message("settings.general.op.poll.seconds"))
+            }.rowComment(
+                JujutsuBundle.message("settings.general.op.poll.comment"),
                 maxLineLength = NARROW_COMMENT_WIDTH
             )
             row(JujutsuBundle.message("settings.general.merge.template.label")) {
@@ -1049,6 +1082,8 @@ class JujutsuConfigurable(
 
         // jj-idea-crik: restart the auto-fetch jobs so a new interval / on-off takes effect now.
         AutoFetchService.getInstance(project).reconcile()
+        // jj-idea-j2vl: likewise for the external-operation poll.
+        OpHeadPollService.getInstance(project).reconcile()
 
         // Save global identity — bindings were updated from the fields by super.apply()
         val config = rootlessConfig.user

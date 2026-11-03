@@ -8,6 +8,7 @@ import `in`.kkkev.jjidea.jj.FetchTimes
 import `in`.kkkev.jjidea.jj.GitRemote
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.JujutsuRepositoryHealth
+import `in`.kkkev.jjidea.jj.OpHeadIds
 import `in`.kkkev.jjidea.jj.RepoActivity
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.settings.JujutsuSettingsState
@@ -38,7 +39,7 @@ class AutoFetchServiceTest {
     private val opHeads = ArrayDeque<String>()
     private val executor = mockk<CommandExecutor> {
         every { gitFetch(any(), any(), any()) } answers { fetchResults.removeFirst() }
-        every { opLog(1, AutoFetchService.OP_HEAD_TEMPLATE) } answers { ok(opHeads.removeFirst() + "\n") }
+        every { opLog(1, OpHeadIds.TEMPLATE) } answers { ok(opHeads.removeFirst() + "\n") }
     }
     private val repo = mockRepo(remotes = listOf(GitRemote("origin", "u")))
 
@@ -63,12 +64,14 @@ class AutoFetchServiceTest {
     init {
         FetchTimes.now = { t }
         FetchTimes.clear()
+        OpHeadIds.clear()
     }
 
     @AfterEach
     fun tearDown() {
         FetchTimes.now = Instant::now
         FetchTimes.clear()
+        OpHeadIds.clear()
         scope.coroutineContext[Job]!!.cancel()
         JujutsuRepositoryHealth.markReadable(path)
     }

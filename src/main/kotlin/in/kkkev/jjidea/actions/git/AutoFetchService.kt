@@ -15,6 +15,7 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.FetchTimes
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.JujutsuRepositoryHealth
+import `in`.kkkev.jjidea.jj.OpHeadIds
 import `in`.kkkev.jjidea.jj.RepoActivity
 import `in`.kkkev.jjidea.jj.fetchedRemoteNames
 import `in`.kkkev.jjidea.jj.invalidate
@@ -51,7 +52,6 @@ import kotlin.time.toJavaDuration
 class AutoFetchService(private val project: Project, private val cs: CoroutineScope) : Disposable {
     private val jobs = ConcurrentHashMap<String, Job>()
     private val repos = ConcurrentHashMap<String, JujutsuRepository>()
-    private val lastOpHead = ConcurrentHashMap<String, String>()
     private val failing = ConcurrentHashMap.newKeySet<String>()
     private val fetching = ConcurrentHashMap.newKeySet<String>()
 
@@ -134,10 +134,8 @@ class AutoFetchService(private val project: Project, private val cs: CoroutineSc
         failing.remove(key)
         FetchTimes.record(key, repo.fetchedRemoteNames(null, allRemotes = true))
 
-        val head = (executor.opLog(1, OP_HEAD_TEMPLATE) as? CommandExecutor.CommandResult.Success)?.stdout?.trim()
-        if (head.isNullOrEmpty()) return true
-        val previous = lastOpHead.put(key, head)
-        if (previous != null && previous != head) onChanged(repo)
+        val head = OpHeadIds.read(executor) ?: return true
+        if (OpHeadIds.record(key, head)) onChanged(repo)
         return true
     }
 
@@ -163,7 +161,6 @@ class AutoFetchService(private val project: Project, private val cs: CoroutineSc
 
     companion object {
         private val log = Logger.getInstance(AutoFetchService::class.java)
-        internal const val OP_HEAD_TEMPLATE = "self.id().short(12)"
 
         fun getInstance(project: Project): AutoFetchService = project.service()
     }

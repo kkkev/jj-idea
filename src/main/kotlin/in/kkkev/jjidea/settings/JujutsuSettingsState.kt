@@ -52,5 +52,9 @@ data class JujutsuSettingsState(
     var mergeDescriptionTemplate: String = "Merge branch '{source}' into {destination}",
     // jj-idea-crik (GitHub #90): periodic background `jj git fetch`. 0 = off (default). Read via
     // JujutsuSettings.autoFetchInterval, which clamps to AUTO_FETCH_MIN..AUTO_FETCH_MAX minutes.
-    var autoFetchIntervalMinutes: Int = 0
+    var autoFetchIntervalMinutes: Int = 0,
+    // jj-idea-j2vl (GitHub #115): poll `jj op log -n1` for external operations the file watcher can't see
+    // (network drives, custom backends). 0 = off (default). Read via JujutsuSettings.opHeadPollInterval,
+    // which clamps to OP_HEAD_POLL_MIN..OP_HEAD_POLL_MAX seconds.
+    var opHeadPollIntervalSeconds: Int = 0
 )

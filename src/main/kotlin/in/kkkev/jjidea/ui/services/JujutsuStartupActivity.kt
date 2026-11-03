@@ -50,6 +50,10 @@ class JujutsuStartupActivity : ProjectActivity {
         val autoFetch = AutoFetchService.getInstance(project)
         project.stateModel.initialisedRepositories.connectAndFireSync(autoFetch) { autoFetch.reconcile(it.values) }
 
+        // Poll for external operations the file watcher can't see (jj-idea-j2vl); a no-op unless enabled.
+        val opPoll = OpHeadPollService.getInstance(project)
+        project.stateModel.initialisedRepositories.connectAndFireSync(opPoll) { opPoll.reconcile(it.values) }
+
         // Initialize availability checking
         project.jjAvailabilityStatus.connectAndFireSync(project) { status ->
             log.info("jj availability status changed: $status")

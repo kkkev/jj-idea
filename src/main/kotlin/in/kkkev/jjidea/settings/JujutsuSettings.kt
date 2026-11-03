@@ -14,6 +14,7 @@ import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Persistent configuration for Jujutsu plugin.
@@ -197,8 +198,16 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
         get() = state.autoFetchIntervalMinutes.takeIf { it > 0 }
             ?.coerceIn(AUTO_FETCH_MIN_MINUTES, AUTO_FETCH_MAX_MINUTES)?.minutes
 
+    /** jj-idea-j2vl: external-operation poll period, or null when off. Clamped so a hand-edited value can't spin jj. */
+    val opHeadPollInterval: Duration?
+        get() = state.opHeadPollIntervalSeconds.takeIf { it > 0 }
+            ?.coerceIn(OP_HEAD_POLL_MIN_SECONDS, OP_HEAD_POLL_MAX_SECONDS)?.seconds
+
     companion object {
         const val DEFAULT_LOG_WINDOW_ID = "default"
+        const val OP_HEAD_POLL_MIN_SECONDS = 5
+        const val OP_HEAD_POLL_MAX_SECONDS = 600
+        const val OP_HEAD_POLL_DEFAULT_SECONDS = 10
         const val AUTO_FETCH_MIN_MINUTES = 1
         const val AUTO_FETCH_MAX_MINUTES = 120
         const val AUTO_FETCH_DEFAULT_MINUTES = 10

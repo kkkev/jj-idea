@@ -405,6 +405,17 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         }
     }
 
+    /**
+     * The op-head poll (jj-idea-j2vl) saw the operation id move. Goes through the same debounced entry as an
+     * `op_heads` VFS event, so a poll tick and a file event arriving together coalesce into one refresh.
+     */
+    fun externalOperationDetected(repo: JujutsuRepository) {
+        if (refreshSuppression.get() == 0) {
+            log.info("Operation of ${repo.displayName} changed (polled), scheduling refresh")
+            scheduleRepositoryRefresh()
+        }
+    }
+
     private fun scheduleRepositoryRefresh() {
         repositoryStateAlarm.cancelAllRequests()
         repositoryStateAlarm.addRequest({
