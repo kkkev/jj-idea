@@ -27,14 +27,17 @@ internal fun plansFor(entries: List<OperationEntry>) = UndoRedoPlans(resolveUndo
 
 /**
  * Reads the head of the operation log with one `jj op log -n[UNDO_REDO_WINDOW]` (it passes
- * `--ignore-working-copy`, so it never snapshots) and works out both plans from it. A failed read
- * degrades to [UndoRedoPlans.NOTHING]: disabled actions, never a guess.
+ * `--ignore-working-copy`, so it never snapshots) and works out both plans from it. When [repoPath] is
+ * given, also records the head operation in [OpHeadIds] so an active poll or auto-fetch never re-triggers
+ * a refresh for an operation this refresh already covered. A failed read degrades to [UndoRedoPlans.NOTHING]:
+ * disabled actions, never a guess.
  */
-internal fun loadUndoRedoPlans(executor: CommandExecutor): UndoRedoPlans {
+internal fun loadUndoRedoPlans(executor: CommandExecutor, repoPath: String? = null): UndoRedoPlans {
     val result = executor.opLog(UNDO_REDO_WINDOW, OP_LOG_TEMPLATE)
-    return if (result is CommandExecutor.CommandResult.Success) {
-        plansFor(parseOpLog(result.stdout))
-    } else {
-        UndoRedoPlans.NOTHING
+    if (result !is CommandExecutor.CommandResult.Success) return UndoRedoPlans.NOTHING
+    val entries = parseOpLog(result.stdout)
+    if (repoPath != null) {
+        entries.firstOrNull()?.let { OpHeadIds.record(repoPath, it.id.toString()) }
     }
+    return plansFor(entries)
 }

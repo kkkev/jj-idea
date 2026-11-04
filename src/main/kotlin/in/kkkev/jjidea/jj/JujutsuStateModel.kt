@@ -226,7 +226,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         emptyMap()
     ) {
         initialisedRepositories.immediateValue.values.associateWith { repo ->
-            loadUndoRedoPlans(repo.commandExecutor)
+            loadUndoRedoPlans(repo.commandExecutor, repo.directory.path)
         }
     }
 
@@ -418,13 +418,20 @@ class JujutsuStateModel(private val project: Project) : Disposable {
 
     private fun scheduleRepositoryRefresh() {
         repositoryStateAlarm.cancelAllRequests()
-        repositoryStateAlarm.addRequest({
-            // Re-baseline first: this refresh covers every operation up to now, so checkOperationHeads must not
-            // report the same one again.
-            initialisedRepositories.value.values.forEach { opHeadsTracker.update(it.directory.path) }
-            invalidateRepositoryState()
-            logRefresh.notify(Unit)
-        }, 300)
+        repositoryStateAlarm.addRequest({ applyScheduledRepositoryRefresh() }, 300)
+    }
+
+    internal fun applyScheduledRepositoryRefresh(
+        repos: Collection<JujutsuRepository> = initialisedRepositories.value.values
+    ) {
+        // Re-baseline first: this refresh covers every operation up to now, so checkOperationHeads must not
+        // report the same one again. Also evict each repo's LogCache, matching JujutsuRepository.invalidate().
+        repos.forEach {
+            opHeadsTracker.update(it.directory.path)
+            it.logCache.clear()
+        }
+        invalidateRepositoryState()
+        logRefresh.notify(Unit)
     }
 
     init {

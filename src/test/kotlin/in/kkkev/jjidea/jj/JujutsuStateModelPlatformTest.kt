@@ -91,6 +91,32 @@ class JujutsuStateModelPlatformTest {
         }
     }
 
+    @Test
+    fun `applyScheduledRepositoryRefresh clears logCache and fires logRefresh`() {
+        val stateModel = project.get().stateModel
+        val disposable = Disposer.newDisposable()
+        try {
+            var logRefreshFired = false
+            stateModel.logRefresh.connect(disposable) { logRefreshFired = true }
+
+            val cache = mockk<LogCache>(relaxed = true)
+            val repo = mockk<JujutsuRepository> {
+                every { directory } returns mockk<VirtualFile> {
+                    every { path } returns "/nonexistent/scheduled-refresh-test"
+                }
+                every { logCache } returns cache
+            }
+
+            stateModel.applyScheduledRepositoryRefresh(listOf(repo))
+            UIUtil.dispatchAllInvocationEvents()
+
+            io.mockk.verify(exactly = 1) { cache.clear() }
+            logRefreshFired shouldBe true
+        } finally {
+            Disposer.dispose(disposable)
+        }
+    }
+
     // Pins the actual production dispatch behind refreshVfsInBackground's default `dispatch`
     // argument, which the unit-level InvalidateVfsScaleTest can't observe since it injects its
     // own seam. Regresses jj-idea-nuk0 / GitHub #113: markDirtyAndRefresh's recursive walk used
