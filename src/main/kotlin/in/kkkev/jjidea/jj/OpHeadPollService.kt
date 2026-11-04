@@ -49,7 +49,10 @@ class OpHeadPollService(private val project: Project, private val cs: CoroutineS
             ?.subscribe(
                 ApplicationActivationListener.TOPIC,
                 object : ApplicationActivationListener {
-                    override fun applicationActivated(ideFrame: IdeFrame) = probeAll()
+                    override fun applicationActivated(ideFrame: IdeFrame) {
+                        if (ideFrame.project != null && ideFrame.project != project) return
+                        probeAll()
+                    }
                 }
             )
     }
@@ -62,7 +65,10 @@ class OpHeadPollService(private val project: Project, private val cs: CoroutineS
         jobs.values.forEach { it.cancel() }
         jobs.clear()
         this.repos.clear()
-        if (settings.opHeadPollInterval == null) return
+        if (settings.opHeadPollInterval == null) {
+            OpHeadIds.setPolled(this, emptySet())
+            return
+        }
         for (repo in repos) {
             val key = repo.directory.path
             this.repos[key] = repo
@@ -71,6 +77,7 @@ class OpHeadPollService(private val project: Project, private val cs: CoroutineS
                 interval = { settings.opHeadPollInterval ?: DEFAULT_INTERVAL }
             ) { pollOnce(repo) }
         }
+        OpHeadIds.setPolled(this, this.repos.keys)
         probeAll() // baseline now, rather than a full interval from now
     }
 
@@ -84,6 +91,7 @@ class OpHeadPollService(private val project: Project, private val cs: CoroutineS
     internal fun pollOnce(repo: JujutsuRepository): Boolean {
         if (settings.opHeadPollInterval == null) return true
         val key = repo.directory.path
+        OpHeadIds.addPolled(this, key)
         if (JujutsuRepositoryHealth.healthFor(key) != null || RepoActivity.isBusy(key)) return true
         // The poll loop and an activation probe must not run jj on the same repo at once.
         if (!probing.add(key)) return true
@@ -97,6 +105,7 @@ class OpHeadPollService(private val project: Project, private val cs: CoroutineS
     }
 
     override fun dispose() {
+        OpHeadIds.setPolled(this, emptySet())
         jobs.values.forEach { it.cancel() }
     }
 

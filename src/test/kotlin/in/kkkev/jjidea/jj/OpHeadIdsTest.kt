@@ -37,6 +37,30 @@ class OpHeadIdsTest {
     }
 
     @Test
+    fun `full operation ids are normalised to the 12-char template prefix`() {
+        val full = "abcdef012345" + "9".repeat(116)
+        OpHeadIds.record("/r", "000000000000")
+        OpHeadIds.record("/r", full) shouldBe true
+        OpHeadIds.record("/r", "abcdef012345") shouldBe false
+    }
+
+    @Test
+    fun `polled repo tracking scopes per owner`() {
+        val ownerA = Any()
+        val ownerB = Any()
+        OpHeadIds.isPolled("/a") shouldBe false
+
+        OpHeadIds.setPolled(ownerA, listOf("/a", "/b"))
+        OpHeadIds.setPolled(ownerB, listOf("/b"))
+        OpHeadIds.isPolled("/a") shouldBe true
+        OpHeadIds.isPolled("/b") shouldBe true
+
+        OpHeadIds.setPolled(ownerA, emptySet())
+        OpHeadIds.isPolled("/a") shouldBe false
+        OpHeadIds.isPolled("/b") shouldBe true
+    }
+
+    @Test
     fun `read trims the id and reports failure or empty output as null`() {
         val executor = mockk<CommandExecutor>()
         every { executor.opLog(1, OpHeadIds.TEMPLATE) } returns ok("abc123\n")

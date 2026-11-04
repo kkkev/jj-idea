@@ -52,3 +52,14 @@ internal fun readOpHeadIds(workspaceRoot: Path): Set<String>? = try {
 } catch (_: IOException) {
     null
 }
+
+/**
+ * True when [workspaceRoot]'s repo has an `op_heads` directory without a local `heads/` subdirectory —
+ * the layout of a custom `OpHeadsStore` backend that keeps operation heads outside the local filesystem,
+ * where watching `op_heads` on disk can never observe an operation change. Resolves secondary-workspace
+ * `.jj/repo` pointer files via [resolveJjRepoDir].
+ */
+internal fun hasExternalOpHeads(workspaceRoot: Path): Boolean {
+    val opHeads = resolveJjRepoDir(workspaceRoot).resolve("op_heads")
+    return Files.isDirectory(opHeads) && !Files.isDirectory(opHeads.resolve("heads"))
+}

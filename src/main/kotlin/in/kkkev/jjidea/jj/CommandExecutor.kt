@@ -763,7 +763,9 @@ interface CommandExecutor {
 
         fun createContext(result: CommandResult.Success): CO
 
-        private fun runAction() = RepoActivity.track(busyKey) { commandExecutor.action() }
+        private fun runAction() = RepoActivity.track(busyKey) {
+            commandExecutor.action().also { recordCommandOperation(busyKey, commandExecutor, it) }
+        }
 
         fun fireFailure(failure: CommandResult.Failure, retry: () -> Unit) = onFailure(failure)
 
@@ -897,3 +899,30 @@ interface CommandExecutor {
 fun JujutsuRepository.createCommand(
     action: CommandExecutor.() -> CommandExecutor.CommandResult
 ): CommandExecutor.Command.WithRepo = CommandExecutor.Command.WithRepo(this, commandExecutor, action)
+
+/**
+ * Updates [OpHeadIds] inside [RepoActivity.track] so a concurrent [OpHeadPollService] tick cannot
+ * fire in the gap before `runLater { repo.invalidate() }` and mistake a command the plugin just ran
+ * for an external operation. [CommandExecutor.CommandResult.Success.Reversible] already carries its
+ * operation id; non-tracked writes read it only when [OpHeadIds.isPolled] is true, keeping unpolled
+ * repos free of any extra `jj` call.
+ */
+internal fun recordCommandOperation(
+    busyKey: String?,
+    executor: CommandExecutor,
+    result: CommandExecutor.CommandResult
+) {
+    if (busyKey == null || result !is CommandExecutor.CommandResult.Success) return
+    when (result) {
+        is CommandExecutor.CommandResult.Success.Reversible ->
+            OpHeadIds.record(busyKey, result.operation.toString())
+
+        is CommandExecutor.CommandResult.Success.Irreversible ->
+            if (OpHeadIds.isPolled(busyKey) &&
+                result.reason != CommandExecutor.CommandResult.Success.Irreversible.Reason.READ_ONLY &&
+                result.reason != CommandExecutor.CommandResult.Success.Irreversible.Reason.NO_OPERATION
+            ) {
+                OpHeadIds.read(executor)?.let { OpHeadIds.record(busyKey, it) }
+            }
+    }
+}

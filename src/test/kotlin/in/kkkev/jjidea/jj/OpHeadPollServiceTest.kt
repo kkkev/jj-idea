@@ -127,6 +127,79 @@ class OpHeadPollServiceTest {
     }
 
     @Test
+    fun `in-IDE reversible command re-baselines without an extra opLog read, and later external op still fires`() {
+        results += head("000000000001")
+        service.pollOnce(repo) shouldBe true
+        io.mockk.clearMocks(executor, answers = false)
+
+        val fullOp2 = "000000000002" + "a".repeat(116)
+        recordCommandOperation(
+            path,
+            executor,
+            CommandResult.Success.Reversible("", "", OperationId(fullOp2))
+        )
+        verify(exactly = 0) { executor.opLog(any(), any()) }
+
+        results += listOf(head("000000000002"), head("000000000003"))
+        service.pollOnce(repo) shouldBe true
+        changed.size shouldBe 0
+
+        service.pollOnce(repo) shouldBe true
+        changed shouldContainExactly listOf(repo)
+    }
+
+    @Test
+    fun `in-IDE non-tracked mutating command reads op head only when repo is polled`() {
+        val unpolledResult = CommandResult.Success.Irreversible(
+            "",
+            "",
+            CommandResult.Success.Irreversible.Reason.NOT_TRACKED
+        )
+        recordCommandOperation("/repo/unpolled", executor, unpolledResult)
+        verify(exactly = 0) { executor.opLog(any(), any()) }
+
+        results += listOf(head("000000000001"), head("000000000002"), head("000000000002"))
+        service.pollOnce(repo) shouldBe true // primes and marks polled
+        recordCommandOperation(path, executor, unpolledResult) // reads 000000000002
+
+        // Read-only and no-op results never spawn an extra opLog probe even on a polled repo.
+        io.mockk.clearMocks(executor, answers = false)
+        recordCommandOperation(
+            path,
+            executor,
+            CommandResult.Success.Irreversible("", "", CommandResult.Success.Irreversible.Reason.READ_ONLY)
+        )
+        recordCommandOperation(
+            path,
+            executor,
+            CommandResult.Success.Irreversible("", "", CommandResult.Success.Irreversible.Reason.NO_OPERATION)
+        )
+        verify(exactly = 0) { executor.opLog(any(), any()) }
+
+        service.pollOnce(repo) shouldBe true
+        changed.size shouldBe 0
+    }
+
+    @Test
+    fun `loadUndoRedoPlans primes and re-baselines OpHeadIds from the op log it already reads`() {
+        val nul = 0.toChar()
+        val fullOp1 = "111111111111" + "0".repeat(116)
+        val opLogLine = listOf(fullOp1, "", "new empty commit", "1700000000", "u@h", "0", "0", "")
+            .joinToString(nul.toString(), postfix = nul.toString())
+        every { executor.opLog(UNDO_REDO_WINDOW, any()) } returns
+            CommandResult.Success.Irreversible(opLogLine, "", CommandResult.Success.Irreversible.Reason.READ_ONLY)
+
+        loadUndoRedoPlans(executor, path)
+
+        results += listOf(head("111111111111"), head("222222222222"))
+        service.pollOnce(repo) shouldBe true
+        changed.size shouldBe 0
+
+        service.pollOnce(repo) shouldBe true
+        changed shouldContainExactly listOf(repo)
+    }
+
+    @Test
     fun `reconcile runs one job per repo, and none when off`() {
         every { executor.opLog(any(), any()) } returns head("aaa")
         service.reconcile(listOf(repo, mockRepo("/repo/other")))
@@ -155,6 +228,34 @@ class OpHeadPollServiceTest {
         s.loadState(JujutsuSettingsState(opHeadPollIntervalSeconds = 7))
         s.state.opHeadPollIntervalSeconds shouldBe 7
         JujutsuSettings().state.opHeadPollIntervalSeconds shouldBe 0
+    }
+
+    @Test
+    fun `detectOperationHeadChange uses local OpHeadsTracker without spawning jj on local repos`() {
+        var heads: Set<String>? = setOf("op-1")
+        val tracker = OpHeadsTracker { heads }
+
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { false }) shouldBe false
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { false }) shouldBe false
+        heads = setOf("op-2")
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { false }) shouldBe true
+
+        verify(exactly = 0) { executor.opLog(any(), any()) }
+    }
+
+    @Test
+    fun `detectOperationHeadChange falls back to OpHeadIds on healthy custom-backend repos`() {
+        val tracker = OpHeadsTracker { null }
+        results += listOf(head("111111111111"), head("111111111111"), head("222222222222"))
+
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { true }) shouldBe false
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { true }) shouldBe false
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { true }) shouldBe true
+        verify(exactly = 3) { executor.opLog(1, any()) }
+
+        JujutsuRepositoryHealth.mark(path, RepositoryHealth.Unreadable("broken"))
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { true }) shouldBe false
+        verify(exactly = 3) { executor.opLog(1, any()) }
     }
 
     /**
