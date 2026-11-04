@@ -141,6 +141,85 @@ class JujutsuStateModelPlatformTest {
     }
 
     @Test
+    fun `checkAllOperationHeadsOnActivation's default dispatch runs probe off the EDT`() {
+        val stateModel = project.get().stateModel
+        val edtThread = Thread.currentThread()
+        var probeThread: Thread? = null
+        val latch = CountDownLatch(1)
+        val repo = mockk<JujutsuRepository> {
+            every { directory } returns mockk<VirtualFile> {
+                every { path } returns "/nonexistent/activation-edt-test"
+            }
+        }
+
+        stateModel.checkAllOperationHeadsOnActivation(
+            repos = listOf(repo),
+            probe = {
+                probeThread = Thread.currentThread()
+                latch.countDown()
+            }
+        )
+        latch.await(5, TimeUnit.SECONDS) shouldBe true
+
+        probeThread shouldNotBe null
+        probeThread shouldNotBe edtThread
+    }
+
+    @Test
+    fun `checkAllOperationHeadsOnActivation skips polled busy unhealthy and cooldown repos`() {
+        val stateModel = project.get().stateModel
+
+        fun repoAt(repoPath: String) = mockk<JujutsuRepository> {
+            every { directory } returns mockk<VirtualFile> {
+                every { path } returns repoPath
+            }
+        }
+
+        val idleRepo = repoAt("/activation/idle")
+        val polledRepo = repoAt("/activation/polled")
+        val busyRepo = repoAt("/activation/busy")
+        val unhealthyRepo = repoAt("/activation/unhealthy")
+        val probed = mutableListOf<String>()
+        val pollOwner = Any()
+        OpHeadIds.setPolled(pollOwner, listOf("/activation/polled"))
+        JujutsuRepositoryHealth.mark("/activation/unhealthy", RepositoryHealth.Unreadable("broken"))
+        try {
+            RepoActivity.track("/activation/busy") {
+                stateModel.checkAllOperationHeadsOnActivation(
+                    repos = listOf(idleRepo, polledRepo, busyRepo, unhealthyRepo),
+                    nowNanos = 1_000_000_000L,
+                    minIntervalNanos = 500_000_000L,
+                    probe = { probed += it.directory.path },
+                    dispatch = { it() }
+                )
+            }
+            probed shouldBe listOf("/activation/idle")
+
+            // Within the cooldown window, the same repo is skipped; once it elapses, it probes again.
+            stateModel.checkAllOperationHeadsOnActivation(
+                repos = listOf(idleRepo),
+                nowNanos = 1_200_000_000L,
+                minIntervalNanos = 500_000_000L,
+                probe = { probed += it.directory.path },
+                dispatch = { it() }
+            )
+            probed shouldBe listOf("/activation/idle")
+
+            stateModel.checkAllOperationHeadsOnActivation(
+                repos = listOf(idleRepo),
+                nowNanos = 1_600_000_000L,
+                minIntervalNanos = 500_000_000L,
+                probe = { probed += it.directory.path },
+                dispatch = { it() }
+            )
+            probed shouldBe listOf("/activation/idle", "/activation/idle")
+        } finally {
+            OpHeadIds.setPolled(pollOwner, emptySet())
+            JujutsuRepositoryHealth.markReadable("/activation/unhealthy")
+        }
+    }
+
+    @Test
     fun `filterToReference notifier fires connected listener with the reference name`() {
         val stateModel = project.get().stateModel
         val disposable = Disposer.newDisposable()

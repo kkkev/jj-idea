@@ -49,7 +49,10 @@ class OpHeadPollService(private val project: Project, private val cs: CoroutineS
             ?.subscribe(
                 ApplicationActivationListener.TOPIC,
                 object : ApplicationActivationListener {
-                    override fun applicationActivated(ideFrame: IdeFrame) = probeAll()
+                    override fun applicationActivated(ideFrame: IdeFrame) {
+                        if (ideFrame.project != null && ideFrame.project != project) return
+                        probeAll()
+                    }
                 }
             )
     }

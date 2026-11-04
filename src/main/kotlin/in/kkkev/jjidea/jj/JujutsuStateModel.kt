@@ -1,6 +1,8 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationActivationListener
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -17,6 +19,7 @@ import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import com.intellij.openapi.wm.IdeFrame
 import com.intellij.util.Alarm
 import com.intellij.util.CommonProcessors
 import com.intellij.vcsUtil.VcsUtil
@@ -33,6 +36,8 @@ import `in`.kkkev.jjidea.vcs.ignore.JujutsuTrackedFilesService
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
 import `in`.kkkev.jjidea.vcs.projectLevelVcsManager
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -391,17 +396,60 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         }
 
     private val opHeadsTracker = OpHeadsTracker { readOpHeadIds(Path.of(it)) }
+    private val activationProbing = ConcurrentHashMap.newKeySet<String>()
+    private val lastActivationProbeNanos = ConcurrentHashMap<String, Long>()
 
     /**
-     * Call after a plugin `jj` command that may have snapshotted the working copy (jj-idea-2570.12). If the
-     * operation heads moved since last seen - a file edit that really changed `@` - reloads repo state and the
-     * log, exactly as an `op_heads` file event would. This is the fallback for setups where that watch delivers
-     * nothing; where it works, the 300 ms alarm below merges the two into one refresh. Safe off the EDT only.
+     * Call after a plugin `jj` command that may have snapshotted the working copy (jj-idea-2570.12), or when the IDE
+     * regains focus. If the operation heads moved since last seen, reloads repo state and the log, exactly as an
+     * `op_heads` file event would. Uses local `op_heads/heads` listing where present and falls back to [OpHeadIds]
+     * for custom backends without a local `heads/` directory. Where the file watch works, the 300 ms alarm below
+     * merges the two into one refresh. Safe off the EDT only.
      */
     fun checkOperationHeads(repo: JujutsuRepository) {
-        if (opHeadsTracker.update(repo.directory.path) && refreshSuppression.get() == 0) {
+        if (detectOperationHeadChange(repo.directory.path, repo.commandExecutor, opHeadsTracker) &&
+            refreshSuppression.get() == 0
+        ) {
             log.info("Operation heads of ${repo.displayName} changed, scheduling refresh")
             scheduleRepositoryRefresh()
+        }
+    }
+
+    /**
+     * Checks every unpolled, idle, healthy repository's operation heads off the EDT when this
+     * project's IDE frame regains focus. Local repositories run a 1-directory `op_heads/heads`
+     * listing (no subprocess); custom backends without a local `heads/` directory fall back to
+     * [OpHeadIds.read]. Repositories actively polled by [OpHeadPollService] are skipped because
+     * its own activation listener probes them.
+     */
+    internal fun checkAllOperationHeadsOnActivation(
+        repos: Collection<JujutsuRepository> = initialisedRepositories.value.values,
+        nowNanos: Long = System.nanoTime(),
+        minIntervalNanos: Long = ACTIVATION_PROBE_COOLDOWN_NANOS,
+        probe: (JujutsuRepository) -> Unit = ::checkOperationHeads,
+        dispatch: (() -> Unit) -> Unit = { runInBackground(action = it) }
+    ) {
+        for (repo in repos) {
+            val key = repo.directory.path
+            if (OpHeadIds.isPolled(key) ||
+                RepoActivity.isBusy(key) ||
+                JujutsuRepositoryHealth.healthFor(key) != null
+            ) {
+                continue
+            }
+            val previous = lastActivationProbeNanos[key]
+            if (previous != null && nowNanos - previous < minIntervalNanos) continue
+            if (!activationProbing.add(key)) continue
+            lastActivationProbeNanos[key] = nowNanos
+            dispatch {
+                try {
+                    if (!RepoActivity.isBusy(key) && JujutsuRepositoryHealth.healthFor(key) == null) {
+                        probe(repo)
+                    }
+                } finally {
+                    activationProbing.remove(key)
+                }
+            }
         }
     }
 
@@ -447,6 +495,16 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         initialisedRepositories.invalidate()
 
         val connection = project.messageBus.connect(this)
+
+        ApplicationManager.getApplication()?.messageBus?.connect(this)?.subscribe(
+            ApplicationActivationListener.TOPIC,
+            object : ApplicationActivationListener {
+                override fun applicationActivated(ideFrame: IdeFrame) {
+                    if (ideFrame.project != null && ideFrame.project != project) return
+                    checkAllOperationHeadsOnActivation()
+                }
+            }
+        )
 
         // Watch for file changes to mark files dirty and detect .jj directory changes
         connection.subscribe(
@@ -812,3 +870,22 @@ internal fun triggersRepositoryRefresh(
     isOpHeadsChange: (VirtualFile) -> Boolean,
     isRepoRootChange: (VirtualFile) -> Boolean
 ): Boolean = files.any { f -> f != null && (isOpHeadsChange(f) || isRepoRootChange(f)) }
+
+private val ACTIVATION_PROBE_COOLDOWN_NANOS = TimeUnit.MILLISECONDS.toNanos(500)
+
+/**
+ * Checks whether [repoPath]'s operation head changed since last seen, using local `op_heads/heads` listing
+ * via [tracker] when present and falling back to [OpHeadIds] on healthy custom-backend repositories whose
+ * `op_heads` directory has no local `heads/` subdirectory.
+ */
+internal fun detectOperationHeadChange(
+    repoPath: String,
+    executor: CommandExecutor,
+    tracker: OpHeadsTracker,
+    externalOpHeads: (String) -> Boolean = { hasExternalOpHeads(Path.of(it)) }
+): Boolean {
+    if (tracker.update(repoPath)) return true
+    if (!externalOpHeads(repoPath) || JujutsuRepositoryHealth.healthFor(repoPath) != null) return false
+    val head = OpHeadIds.read(executor) ?: return false
+    return OpHeadIds.record(repoPath, head)
+}

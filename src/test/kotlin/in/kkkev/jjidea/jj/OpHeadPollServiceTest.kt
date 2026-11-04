@@ -230,6 +230,34 @@ class OpHeadPollServiceTest {
         JujutsuSettings().state.opHeadPollIntervalSeconds shouldBe 0
     }
 
+    @Test
+    fun `detectOperationHeadChange uses local OpHeadsTracker without spawning jj on local repos`() {
+        var heads: Set<String>? = setOf("op-1")
+        val tracker = OpHeadsTracker { heads }
+
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { false }) shouldBe false
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { false }) shouldBe false
+        heads = setOf("op-2")
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { false }) shouldBe true
+
+        verify(exactly = 0) { executor.opLog(any(), any()) }
+    }
+
+    @Test
+    fun `detectOperationHeadChange falls back to OpHeadIds on healthy custom-backend repos`() {
+        val tracker = OpHeadsTracker { null }
+        results += listOf(head("111111111111"), head("111111111111"), head("222222222222"))
+
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { true }) shouldBe false
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { true }) shouldBe false
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { true }) shouldBe true
+        verify(exactly = 3) { executor.opLog(1, any()) }
+
+        JujutsuRepositoryHealth.mark(path, RepositoryHealth.Unreadable("broken"))
+        detectOperationHeadChange(path, executor, tracker, externalOpHeads = { true }) shouldBe false
+        verify(exactly = 3) { executor.opLog(1, any()) }
+    }
+
     /**
      * Operation count (contributing.md § Performance & Scale): 10 repos for 60 s virtual at a 10 s interval
      * is one jj process per repo per tick, 60 in all, and none while the IDE is inactive.

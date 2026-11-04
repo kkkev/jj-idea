@@ -70,4 +70,33 @@ class JjRepoDirTest {
         isUnderAnyDir("/b/op_heads/x", dirs) shouldBe false
         isUnderAnyDir("/a/op_heads", emptySet()) shouldBe false
     }
+
+    @Test
+    fun `hasExternalOpHeads is false when local op_heads heads directory exists`() {
+        val root = workspace("local")
+        Files.createDirectories(root.resolve(".jj/repo/op_heads/heads"))
+
+        hasExternalOpHeads(root) shouldBe false
+    }
+
+    @Test
+    fun `hasExternalOpHeads is true when op_heads exists without a local heads directory`() {
+        val root = workspace("custom")
+        Files.createDirectories(root.resolve(".jj/repo/op_heads"))
+        Files.writeString(root.resolve(".jj/repo/op_heads/type"), "custom_backend")
+
+        hasExternalOpHeads(root) shouldBe true
+    }
+
+    @Test
+    fun `hasExternalOpHeads resolves secondary workspace pointers and rejects missing op_heads`() {
+        val main = workspace("main")
+        Files.createDirectories(main.resolve(".jj/repo/op_heads"))
+        Files.writeString(main.resolve(".jj/repo/op_heads/type"), "custom_backend")
+        val ws = workspace("ws2")
+        Files.writeString(ws.resolve(".jj/repo"), "../../main/.jj/repo\n")
+
+        hasExternalOpHeads(ws) shouldBe true
+        hasExternalOpHeads(workspace("uninit")) shouldBe false
+    }
 }
