@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Annotate tooltip shows the full description**: hovering a line in the Annotate gutter now shows the change's whole commit message (body and trailers, with links), not just its first line. ([#161](https://github.com/kkkev/jj-idea/issues/161))
 - **Annotation click sometimes did nothing**: clicking an annotation to jump to its change in the log was silently ignored after a refresh that found nothing new (for example a file-watcher refresh), and kept being ignored until the log was reloaded. The click now selects the change. ([#140](https://github.com/kkkev/jj-idea/issues/140))
 
 ### Added

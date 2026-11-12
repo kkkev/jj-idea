@@ -198,6 +198,17 @@ class AnnotationParserTest {
     }
 
     @Test
+    fun `annotation line tooltip shows full multi-line description`() {
+        val output = record(description = "Short summary\\n\\nDetailed body line\\nRefs: #123")
+
+        val tooltip = AnnotationParser.parse(output)[0].getHtmlTooltip()
+
+        tooltip shouldContain "Short summary"
+        tooltip shouldContain "Detailed body line"
+        tooltip shouldContain "Refs:"
+    }
+
+    @Test
     fun `annotation line tooltip handles empty description`() {
         val output = record(description = "")
 

@@ -194,7 +194,11 @@ fun TextCanvas.append(
     }
 }
 
-fun TextCanvas.appendChangeTooltip(detail: ChangeDetail) {
+/**
+ * Change-id/commit-id/author/date block plus the description: only its first line by default, or all of it
+ * when [fullDescription] (the Annotate gutter, which has no details pane beside it - GitHub #161).
+ */
+fun TextCanvas.appendChangeTooltip(detail: ChangeDetail, fullDescription: Boolean = false) {
     append(detail.id)
     append(" (")
     append(detail.commitId)
@@ -204,7 +208,9 @@ fun TextCanvas.appendChangeTooltip(detail: ChangeDetail) {
         if (detail.author != null) append(" \u00b7 ")
         append(DateTimeFormatter.formatAbsolute(ts))
     }
-    control("<pre style='white-space: pre-wrap;'>") { appendSummary(detail.description) }
+    control("<pre style='white-space: pre-wrap;'>") {
+        if (fullDescription) append(detail.description) else appendSummary(detail.description)
+    }
 }
 
 fun TextCanvas.appendSummary(entry: LogEntry) {

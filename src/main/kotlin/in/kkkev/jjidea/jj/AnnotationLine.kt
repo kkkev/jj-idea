@@ -20,5 +20,5 @@ data class AnnotationLine(
     val lineContent: String,
     val lineNumber: Int
 ) : ChangeDetail {
-    fun getHtmlTooltip(): String = htmlString { appendChangeTooltip(this@AnnotationLine) }
+    fun getHtmlTooltip(): String = htmlString { appendChangeTooltip(this@AnnotationLine, fullDescription = true) }
 }
