@@ -5,6 +5,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.actionSystem.Presentation
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
@@ -26,6 +27,7 @@ import `in`.kkkev.jjidea.jj.GitRemote
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
+import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -474,9 +476,15 @@ class FileChangeActionVisibilityTest {
     inner class `OpenChangeFile` {
         @BeforeEach
         fun setupProject() {
-            every { event.project } returns mockk(relaxed = true)
-            every { event.getData(CommonDataKeys.PROJECT) } returns mockk(relaxed = true)
+            val mockProject = mockk<Project>(relaxed = true)
+            every { event.project } returns mockProject
+            every { event.getData(CommonDataKeys.PROJECT) } returns mockProject
+            // Real repo resolution needs a live Application this test doesn't have.
+            mockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
         }
+
+        @AfterEach
+        fun teardown() = unmockkAll()
 
         @Test
         fun `disabled when no files and no changes with an after-revision`() {
@@ -502,11 +510,23 @@ class FileChangeActionVisibilityTest {
         }
 
         @Test
-        fun `enabled when VIRTUAL_FILE_ARRAY is non-empty`() {
-            every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns
-                arrayOf(mockk<VirtualFile>(relaxed = true))
+        fun `enabled when VIRTUAL_FILE_ARRAY has a file in a Jujutsu repository`() {
+            val file = mockk<VirtualFile>(relaxed = true)
+            every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns arrayOf(file)
+            every { listOf(file).filterInJujutsuRepo(any()) } returns listOf(file)
             OpenChangeFileAction().update(event)
             presentation.isEnabled shouldBe true
+        }
+
+        @Test
+        fun `disabled when VIRTUAL_FILE_ARRAY files are outside any Jujutsu repository`() {
+            // VIRTUAL_FILE_ARRAY is VCS-agnostic: without this, F4 would be claimed in another
+            // VCS's change view (e.g. Piper's Local Changes).
+            val file = mockk<VirtualFile>(relaxed = true)
+            every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns arrayOf(file)
+            every { listOf(file).filterInJujutsuRepo(any()) } returns emptyList()
+            OpenChangeFileAction().update(event)
+            presentation.isEnabled shouldBe false
         }
     }
 

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Actions and settings stayed active outside Jujutsu projects**: opening a project managed by another VCS (or with no VCS) no longer appends `.jj` to the IDE-wide ignored files list, shows a disabled **Open Jujutsu Log** entry in the VCS Operations popup, routes the Commit tool window's **Create Git repository…** link to **Create Jujutsu Repository…**, or claims `Ctrl/Cmd+D`, `Enter` and `F4` on newly added files in another VCS's change list.
 - **Annotate tooltip shows the full description**: hovering a line in the Annotate gutter now shows the change's whole commit message (body and trailers, with links), not just its first line. ([#161](https://github.com/kkkev/jj-idea/issues/161))
 - **Annotation click sometimes did nothing**: clicking an annotation to jump to its change in the log was silently ignored after a refresh that found nothing new (for example a file-watcher refresh), and kept being ignored until the log was reloaded. The click now selects the change. ([#140](https://github.com/kkkev/jj-idea/issues/140))
 
