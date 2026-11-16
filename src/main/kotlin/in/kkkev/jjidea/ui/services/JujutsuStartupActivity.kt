@@ -8,6 +8,8 @@ import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.setup.JjUserConfigChecker
 import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.vcs.isJujutsu
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Bootstraps the Jujutsu state model and UI enablement on project open.
@@ -17,8 +19,8 @@ import `in`.kkkev.jjidea.util.runInBackground
  * and fires the initial root scan. JujutsuUiEnabler then connects to the root state to manage
  * tool window visibility, status-bar widget availability, and log tab suppression.
  *
- * Also initializes [JjAvailabilityChecker] to monitor jj availability and notify users
- * of issues (not found, wrong version, invalid path).
+ * Once a Jujutsu repository is detected, initializes [JjAvailabilityChecker] to monitor jj
+ * availability and notify users of issues (not found, wrong version, invalid path).
  */
 class JujutsuStartupActivity : ProjectActivity {
     private val log = Logger.getInstance(javaClass)
@@ -54,7 +56,24 @@ class JujutsuStartupActivity : ProjectActivity {
         val opPoll = OpHeadPollService.getInstance(project)
         project.stateModel.initialisedRepositories.connectAndFireSync(opPoll) { opPoll.reconcile(it.values) }
 
-        // Initialize availability checking
+        // Subscribe to jj availability only for Jujutsu projects so non-Jujutsu projects
+        // don't trigger jj binary checks or missing-jj warnings on startup.
+        val availabilitySubscribed = AtomicBoolean(false)
+        if (project.isJujutsu) {
+            subscribeAvailability(project, availabilitySubscribed)
+        }
+
+        // Handle late root discovery (e.g. auto-configured after initial load) and user config.
+        project.stateModel.initialisedRepositories.connect(project) { roots ->
+            if (roots.isNotEmpty()) {
+                subscribeAvailability(project, availabilitySubscribed)
+                roots.values.forEach { repo -> checkUserConfigForRepo(project, repo) }
+            }
+        }
+    }
+
+    private fun subscribeAvailability(project: Project, subscribed: AtomicBoolean) {
+        if (!subscribed.compareAndSet(false, true)) return
         project.jjAvailabilityStatus.connectAndFireSync(project) { status ->
             log.info("jj availability status changed: $status")
             when (status) {
@@ -64,13 +83,12 @@ class JujutsuStartupActivity : ProjectActivity {
                     FeatureUpgradeNudge.nudgeIfNeeded(project, status)
                 }
 
-                else -> JujutsuNotifications.notifyJjUnavailable(project, status)
+                else -> {
+                    if (project.isJujutsu) {
+                        JujutsuNotifications.notifyJjUnavailable(project, status)
+                    }
+                }
             }
-        }
-
-        // Check user config per repo as repos become available
-        project.stateModel.initialisedRepositories.connect(project) { roots ->
-            roots.values.forEach { repo -> checkUserConfigForRepo(project, repo) }
         }
     }
 
