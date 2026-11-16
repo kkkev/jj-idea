@@ -166,7 +166,8 @@
       <add-to-group group-id="Vcs.Import"/>
       <add-to-group group-id="Vcs.Operations.Popup.NonVcsAware" relative-to-action="Start.Use.Vcs"
                     anchor="before"/>
-      <add-to-group group-id="Vcs.ToolWindow.CreateRepository"/>
+      <!-- Not added to Vcs.ToolWindow.CreateRepository: the Commit tool window's "Create Git
+           repository..." link runs that group's first action, which must stay Git.Init. -->
       <override-text place="Vcs.Toolbar.Widget"/>
     </action>
 

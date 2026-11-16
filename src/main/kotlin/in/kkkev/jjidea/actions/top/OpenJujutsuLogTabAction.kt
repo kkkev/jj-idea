@@ -23,9 +23,9 @@ class OpenJujutsuLogTabAction : DumbAwareAction(
         JujutsuCustomLogTabManager.getInstance(project).openCustomLogTab(activate = true)
     }
 
-    override fun update(e: AnActionEvent) = with(e.presentation) {
-        // Always visible in menus, but only enabled when in a Jujutsu project
-        isVisible = true
-        isEnabled = e.project.isJujutsu
+    override fun update(e: AnActionEvent) {
+        // Vcs.Operations.Popup.VcsAware is shared by every VCS, so only show this in a
+        // Jujutsu project.
+        e.presentation.isEnabledAndVisible = e.project.isJujutsu
     }
 }

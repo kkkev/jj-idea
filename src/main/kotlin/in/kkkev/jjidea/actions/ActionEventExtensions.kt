@@ -8,6 +8,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsDataKeys
+import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.util.concurrency.annotations.RequiresEdt
@@ -16,6 +17,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.oplog.OperationLogView
 import `in`.kkkev.jjidea.ui.oplog.OperationRow
+import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
@@ -154,13 +156,27 @@ val AnActionEvent.editor: Editor? get() = this.getData(CommonDataKeys.EDITOR)
  * or a foreign backend such as Piper) can appear here. Those are dropped via
  * [isJujutsuChange] before conversion, because [FileChange.from] can only interpret jj
  * revisions and throws `Not a Jujutsu revision` on anything else (GitHub #50 / jj-idea-mdi4).
+ * Working-copy-only changes of another VCS are dropped too, see [isForeignWorkingCopyChange].
  */
 val AnActionEvent.changes: List<FileChange>
     get() = (
         (this.getData(VcsDataKeys.SELECTED_CHANGES) ?: this.getData(VcsDataKeys.CHANGES))
             ?.toList()
             ?: emptyList()
-    ).filter { it.isJujutsuChange }.map { FileChange.from(it) }
+    ).filter { it.isJujutsuChange && !isForeignWorkingCopyChange(it) }.map { FileChange.from(it) }
+
+/**
+ * A change with no Jujutsu revision on either side (e.g. a file added in the working copy)
+ * looks the same in every VCS, so [isJujutsuChange] accepts it whoever owns it. It is foreign
+ * unless its file is in a Jujutsu repository. Without a project there is no repository to
+ * check, so the change is kept.
+ */
+private fun AnActionEvent.isForeignWorkingCopyChange(change: Change): Boolean {
+    val revisions = listOfNotNull(change.beforeRevision, change.afterRevision)
+    if (revisions.any { it.revisionNumber is JujutsuRevisionNumber }) return false
+    val project = project ?: return false
+    return project.possibleJujutsuRepositoryFor(change.filePath) == null
+}
 
 val AnActionEvent.fileRevision get() = this.getData(VcsDataKeys.VCS_FILE_REVISION) as? JujutsuFileRevision
 

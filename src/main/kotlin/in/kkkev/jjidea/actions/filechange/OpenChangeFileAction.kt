@@ -13,6 +13,7 @@ import `in`.kkkev.jjidea.actions.filesFor
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.cacheContents
+import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 
 /**
  * Action to open selected file(s) in the editor.
@@ -50,8 +51,15 @@ class OpenChangeFileAction : DumbAwareAction(
     override fun update(e: AnActionEvent) {
         // Deliberately not e.filePaths: since jj-idea-c2m8 that's non-empty for a deleted-only
         // selection (which filesFor can't open a file for), whereas fileList/changes.after
-        // reflect what's actually openable.
-        val hasFiles = !e.fileList.isNullOrEmpty() || e.changes.any { it.after != null }
-        e.presentation.isEnabled = e.project != null && hasFiles
+        // reflect what's actually openable. fileList is VCS-agnostic, so only files in a
+        // Jujutsu repository count - otherwise F4 would be claimed in other VCSs' views.
+        val project = e.project
+        if (project == null) {
+            e.presentation.isEnabled = false
+            return
+        }
+        val hasFiles = e.fileList.orEmpty().filterInJujutsuRepo(project).isNotEmpty() ||
+            e.changes.any { it.after != null }
+        e.presentation.isEnabled = hasFiles
     }
 }

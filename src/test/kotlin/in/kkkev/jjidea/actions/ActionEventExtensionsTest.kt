@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.actions
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
@@ -13,8 +14,10 @@ import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.FileChange
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
+import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 import `in`.kkkev.jjidea.vcs.possibleVirtualFileFor
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
@@ -286,10 +289,18 @@ class ActionEventExtensionsTest {
     // Regression coverage for GitHub #50 / jj-idea-mdi4: a foreign-VCS change (e.g. Git4Idea
     // in a colocated repo, or an unrelated VCS backend such as Piper) selected alongside jj
     // changes must be dropped, not converted — converting it throws `Not a Jujutsu revision`.
+    // A working-copy change outside any Jujutsu repository (e.g. a file added in Piper) is
+    // dropped too, so jj actions stay out of other VCSs' change views.
 
     @Nested
     inner class `changes` {
         private val event = mockk<AnActionEvent>()
+
+        @BeforeEach
+        fun inJujutsuRepo() {
+            every { event.project } returns project
+            every { project.possibleJujutsuRepositoryFor(any<FilePath>()) } returns mockk<JujutsuRepository>()
+        }
 
         private fun jujutsuChange(path: String): Change {
             val revision = mockk<ContentRevision> {
@@ -336,6 +347,15 @@ class ActionEventExtensionsTest {
             every { event.getData(VcsDataKeys.CHANGES) } returns null
 
             event.changes.map { it.filePath.name } shouldBe listOf("a.kt", "b.kt")
+        }
+
+        @Test
+        fun `drops a working-copy change outside any Jujutsu repository`() {
+            every { project.possibleJujutsuRepositoryFor(any<FilePath>()) } returns null
+            every { event.getData(VcsDataKeys.SELECTED_CHANGES) } returns arrayOf(workingCopyChange("Added.kt"))
+            every { event.getData(VcsDataKeys.CHANGES) } returns null
+
+            event.changes shouldBe emptyList()
         }
     }
 }
